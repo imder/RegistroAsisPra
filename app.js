@@ -367,6 +367,10 @@ const Sync = {
 
 /* ---------- interfaz ---------- */
 let tab = 'asistencia';
+let activeSid = null;                       // estudiante que se está calificando / marcando
+const Fill = { on: false, value: '100', pick: false, undo: [] };   // modo "Relleno rápido"
+const BRUSH = ['100', '90', '80', '70', '60', '50', 'P', 'P1'];
+let paint = null, lastPaint = 0;
 const $ = s => document.querySelector(s);
 
 function toast(msg) {
@@ -381,24 +385,30 @@ function download(blob, name) {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
-function openDlg(html, bind, onEnter) {
+function reserveSheet() {
+  const d = $('#dlg');
+  const on = d.open && d.classList.contains('sheet');
+  document.body.classList.toggle('sheet-open', on);
+  $('#main').style.paddingBottom = on ? d.offsetHeight + 'px' : '';
+}
+function openDlg(html, bind, onEnter, sheet) {
   const dlg = $('#dlg'), form = $('#dlgForm');
+  if (dlg.open && dlg.classList.contains('sheet') !== !!sheet) dlg.close();
+  dlg.classList.toggle('sheet', !!sheet);
   form.innerHTML = html;
   form.onsubmit = e => { e.preventDefault(); if (onEnter) onEnter(); };
   if (bind) bind(form);
   // el botón Guardar es de tipo submit: su clic ya ejecuta la acción, así que se evita que además se envíe el formulario (duplicaba registros)
   const ok = form.querySelector('#ok');
   if (ok && ok.onclick) { const h = ok.onclick; ok.onclick = e => { e.preventDefault(); h.call(ok, e); }; }
-  if (!dlg.open) dlg.showModal();
+  if (!dlg.open) { if (sheet) dlg.show(); else dlg.showModal(); }
+  if (sheet) reserveSheet();
 }
 function closeDlg() { const d = $('#dlg'); if (d.open) d.close(); }
 
 function renderHeader() {
   const sel = $('#courseSel');
   sel.innerHTML = db.courses.map(c => `<option value="${c.id}" ${c.id === db.current ? 'selected' : ''}>${esc(courseShort(c))}</option>`).join('');
-  const c = C();
-  const bits = [c.prof, c.area, c.anio].filter(Boolean);
-  $('#courseInfo').textContent = bits.join(' · ') || 'Toca ⋮ → Datos del curso para completar la información';
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
 }
 
@@ -412,10 +422,19 @@ function render() {
   else main.innerHTML = viewEstudiantes();
   const w = main.querySelector('.grid-wrap, .list');
   if (w) { w.scrollLeft = sx; w.scrollTop = sy; }
+  if (Fill.on && tab === 'practicas') refreshBar();
 }
 
-function rowHead(c, s, k) {
-  return `<td class="c-n">${k + 1}</td><td class="c-name" title="${esc(s.name)}">${esc(s.name)}</td>`;
+function scrollToActive() {
+  const wrap = $('#main .grid-wrap'), tr = $('#main tr.active');
+  if (!wrap || !tr) return;
+  const w = wrap.getBoundingClientRect(), r = tr.getBoundingClientRect();
+  const top = w.top + (wrap.querySelector('thead') ? wrap.querySelector('thead').offsetHeight : 0);
+  if (r.top < top) wrap.scrollTop -= top - r.top + 4;
+  else if (r.bottom > w.bottom) wrap.scrollTop += r.bottom - w.bottom + 4;
+}
+function rowHead(c, s, k, extra) {
+  return `<td class="c-n">${k + 1}</td><td class="c-name" ${extra || ''} title="${esc(s.name)}">${esc(s.name)}</td>`;
 }
 function noStudents() {
   return `<div class="empty">Aún no hay estudiantes.<br><br><button class="btn" data-go="estudiantes">Agregar estudiantes</button></div>`;
@@ -431,7 +450,7 @@ function viewAsistencia() {
   h += `</tr></thead><tbody>`;
   c.students.forEach((s, k) => {
     const ret = s.retirado;
-    h += `<tr class="${ret ? 'retirado' : ''}">${rowHead(c, s, k)}`;
+    h += `<tr class="${ret ? 'retirado' : s.id === activeSid ? 'active' : ''}">${rowHead(c, s, k)}`;
     c.dates.forEach(d => {
       const on = !ret && c.att[s.id] && c.att[s.id][d.id];
       h += `<td class="cell ${on ? 'on' : ''}" ${ret ? '' : `data-a="${s.id}|${d.id}"`}>${on ? '✓' : ''}</td>`;
@@ -445,14 +464,22 @@ function viewPracticas() {
   const c = C();
   let h = `<div class="toolbar"><button class="btn" data-act="add-item" data-tipo="prac">+ Práctica</button>
     <button class="btn sec" data-act="add-item" data-tipo="inv">+ Investigación</button>
-    <span class="grow stat">${c.items.length} columnas</span></div>`;
+    <button class="btn ${Fill.on ? 'on' : 'sec'}" data-act="fill-toggle">${Fill.on ? '✓ Relleno rápido' : 'Relleno rápido'}</button>
+    <span class="grow stat hint">${c.items.length} columnas</span></div>`;
+  if (Fill.on) {
+    const custom = Fill.value !== '' && !BRUSH.includes(Fill.value);
+    h += `<div class="fillbar"><div class="quick">${BRUSH.map(v => `<button data-brush="${v}">${v}</button>`).join('')}
+      <button data-brush="__clear">⌫ Borrar</button><button data-brush="__pick">🖌 Copiar de celda</button><button data-fill="undo">↶ Deshacer</button></div>
+      <div class="fillrow"><input id="fillv" placeholder="Otro" maxlength="8" autocomplete="off" value="${custom ? esc(Fill.value) : ''}"><b class="brush"></b>
+      <span class="stat hint">Toca celdas para pegar el valor (con mouse, arrastra). Toca el título de una columna o un nombre para rellenar toda la columna o fila.</span></div></div>`;
+  }
   if (!c.students.length) return h + noStudents();
   h += `<div class="grid-wrap"><table class="grid"><thead><tr><th class="c-n corner">N°</th><th class="c-name corner">APELLIDOS Y NOMBRES</th>`;
   c.items.forEach(it => { h += `<th class="col ${it.tipo === 'inv' ? 'inv' : 'prac'}" data-hi="${it.id}"><span>${esc(it.name)}</span></th>`; });
   h += `</tr></thead><tbody>`;
   c.students.forEach((s, k) => {
     const ret = s.retirado;
-    h += `<tr class="${ret ? 'retirado' : ''}">${rowHead(c, s, k)}`;
+    h += `<tr class="${ret ? 'retirado' : s.id === activeSid ? 'active' : ''}">${rowHead(c, s, k, ret || !Fill.on ? '' : `data-row="${s.id}"`)}`;
     c.items.forEach(it => {
       const v = c.grades[s.id] && c.grades[s.id][it.id];
       const has = !ret && v !== undefined && v !== '';
@@ -558,11 +585,13 @@ function gradeDialog(sid, iid) {
   const c = C(), s = c.students.find(x => x.id === sid), it = c.items.find(x => x.id === iid);
   if (!s || !it) return;
   const cur = (c.grades[sid] && c.grades[sid][iid]) ?? '';
-  const quick = ['100', '90', '80', '70', '60', '50', 'P', 'P1'];
-  openDlg(`<h3>${esc(it.name)}</h3><div class="stat">${esc(s.name)}</div>
+  const quick = BRUSH;
+  activeSid = sid;
+  render();
+  openDlg(`<h3><span class="who">${c.students.indexOf(s) + 1} · ${esc(s.name)}</span> <small>${esc(it.name)}</small></h3>
     <div class="quick">${quick.map(v => `<button type="button" data-v="${v}" class="${v === String(cur) ? 'sel' : ''}">${v}</button>`).join('')}</div>
-    <label>Otra nota o texto<input id="gv" value="${esc(cur)}" maxlength="8" autocomplete="off"></label>
-    <label style="flex-direction:row;align-items:center;gap:8px;font-size:14px;color:#333"><input type="checkbox" id="adv" style="width:auto" ${db.advance ? 'checked' : ''}> Pasar al siguiente estudiante</label>
+    <label>Otra nota<input id="gv" value="${esc(cur)}" maxlength="8" autocomplete="off"></label>
+    <label style="flex-direction:row;align-items:center;gap:8px;font-size:14px;color:#333"><input type="checkbox" id="adv" style="width:auto" ${db.advance ? 'checked' : ''}> Pasar al siguiente</label>
     <div class="actions"><button type="button" class="btn sec" id="clr">Borrar nota</button><button type="button" class="btn sec" id="cx">Cerrar</button><button class="btn" id="ok">Guardar</button></div>`,
     f => {
       f.querySelector('#cx').onclick = closeDlg;
@@ -570,7 +599,8 @@ function gradeDialog(sid, iid) {
       f.querySelector('#clr').onclick = () => commit('');
       f.querySelector('#ok').onclick = () => commit($('#gv').value.trim());
       if (!matchMedia('(pointer:coarse)').matches) setTimeout(() => { const i = f.querySelector('#gv'); i.focus(); i.select(); }, 50);
-    }, () => commit($('#gv').value.trim()));
+    }, () => commit($('#gv').value.trim()), true);
+  scrollToActive();
   function commit(v) {
     db.advance = $('#adv').checked;
     c.grades[sid] = c.grades[sid] || {};
@@ -584,6 +614,116 @@ function gradeDialog(sid, iid) {
     }
     closeDlg();
   }
+}
+
+/* ---------- relleno rápido / copiado masivo de notas ---------- */
+const brushLabel = () => Fill.pick ? 'Toca la celda que quieres copiar' : Fill.value === '' ? 'Valor: (borrar)' : 'Valor: ' + Fill.value;
+function refreshBar() {
+  document.querySelectorAll('.fillbar [data-brush]').forEach(b => {
+    const v = b.dataset.brush;
+    b.classList.toggle('sel', v === '__pick' ? Fill.pick : !Fill.pick && (v === '__clear' ? Fill.value === '' : v === Fill.value));
+  });
+  const l = $('.fillbar .brush'); if (l) l.textContent = brushLabel();
+}
+function pushUndo() {
+  const c = C();
+  Fill.undo.push({ cid: c.id, g: JSON.stringify(c.grades) });
+  if (Fill.undo.length > 20) Fill.undo.shift();
+}
+function undoFill() {
+  const u = Fill.undo.pop();
+  if (!u) { toast('Nada que deshacer'); return; }
+  const c = db.courses.find(x => x.id === u.cid); if (!c) return;
+  c.grades = JSON.parse(u.g); save(c); render(); toast('Deshecho');
+}
+function setCell(c, sid, iid, v, overwrite = true) {
+  const cur = c.grades[sid] && c.grades[sid][iid];
+  const has = cur !== undefined && cur !== '';
+  if (has && !overwrite) return false;
+  if (v === '') { if (!has) return false; delete c.grades[sid][iid]; return true; }
+  if (cur === v) return false;
+  (c.grades[sid] = c.grades[sid] || {})[iid] = v;
+  return true;
+}
+function applyBulk(pairs, v, overwrite) {
+  const c = C(); pushUndo();
+  let n = 0;
+  pairs.forEach(([sid, iid]) => { if (setCell(c, sid, iid, v, overwrite)) n++; });
+  if (n) save(); else Fill.undo.pop();
+  render();
+  return n;
+}
+function fillCell(el) {
+  if (Date.now() - lastPaint < 600) return;
+  const [sid, iid] = el.dataset.g.split('|'), c = C();
+  activeSid = sid;
+  if (Fill.pick) {
+    const cur = c.grades[sid] && c.grades[sid][iid];
+    Fill.value = cur === undefined ? '' : String(cur); Fill.pick = false;
+    toast(Fill.value ? `Valor copiado: ${Fill.value}` : 'Celda vacía: ahora el pincel borra');
+    render(); return;
+  }
+  pushUndo();
+  if (setCell(c, sid, iid, Fill.value)) save(); else Fill.undo.pop();
+  render();
+}
+function paintTd(td) {
+  const [sid, iid] = td.dataset.g.split('|'), c = C(), v = Fill.value;
+  if (setCell(c, sid, iid, v)) paint.changed = true;
+  td.textContent = v; td.classList.toggle('on', v !== ''); td.classList.toggle('pend', v === '');
+  activeSid = sid;
+}
+function fillColumnDialog(iid) {
+  const c = C(), it = c.items.find(x => x.id === iid); if (!it) return;
+  const others = c.items.filter(x => x.id !== iid);
+  const pairs = c.students.filter(s => !s.retirado).map(s => [s.id, iid]);
+  const clearing = Fill.value === '';
+  openDlg(`<h3>${esc(it.name)}</h3>
+    <div class="stat">${pairs.length} estudiantes activos · ${brushLabel()}</div>
+    <label style="flex-direction:row;align-items:center;gap:8px;font-size:14px;color:#333"><input type="checkbox" id="ow" style="width:auto"> Reemplazar notas que ya existen</label>
+    <button type="button" class="btn" id="ap">${clearing ? 'Borrar notas de la columna' : `Poner ${esc(Fill.value)} en la columna`}</button>
+    ${others.length ? `<label>O copiar las notas de otra columna<select id="src">${others.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('')}</select></label>
+    <button type="button" class="btn sec" id="cp">Copiar notas de esa columna</button>` : ''}
+    <div class="actions"><button type="button" class="btn sec" id="cx">Cancelar</button></div>`,
+    f => {
+      f.querySelector('#cx').onclick = closeDlg;
+      f.querySelector('#ap').onclick = () => {
+        const ow = f.querySelector('#ow').checked;
+        if (clearing && !confirm('¿Borrar todas las notas de esta columna?')) return;
+        const n = applyBulk(pairs, Fill.value, clearing ? true : ow);
+        closeDlg(); toast(`${n} celdas ${clearing ? 'borradas' : 'actualizadas'}`);
+      };
+      const cp = f.querySelector('#cp');
+      if (cp) cp.onclick = () => {
+        const src = f.querySelector('#src').value, ow = f.querySelector('#ow').checked;
+        pushUndo(); let n = 0;
+        pairs.forEach(([sid]) => {
+          const v = c.grades[sid] && c.grades[sid][src];
+          if (v !== undefined && v !== '' && setCell(c, sid, iid, String(v), ow)) n++;
+        });
+        if (n) save(); else Fill.undo.pop();
+        closeDlg(); render(); toast(n ? `${n} notas copiadas` : 'No había notas que copiar');
+      };
+    });
+}
+function fillRowDialog(sid) {
+  const c = C(), s = c.students.find(x => x.id === sid); if (!s) return;
+  activeSid = sid; render();
+  const pairs = c.items.map(it => [sid, it.id]);
+  const clearing = Fill.value === '';
+  openDlg(`<h3>${esc(s.name)}</h3>
+    <div class="stat">${pairs.length} columnas · ${brushLabel()}</div>
+    <label style="flex-direction:row;align-items:center;gap:8px;font-size:14px;color:#333"><input type="checkbox" id="ow" style="width:auto"> Reemplazar notas que ya existen</label>
+    <button type="button" class="btn" id="ap">${clearing ? 'Borrar notas de la fila' : `Poner ${esc(Fill.value)} en toda la fila`}</button>
+    <div class="actions"><button type="button" class="btn sec" id="cx">Cancelar</button></div>`,
+    f => {
+      f.querySelector('#cx').onclick = closeDlg;
+      f.querySelector('#ap').onclick = () => {
+        if (clearing && !confirm('¿Borrar todas las notas de este estudiante?')) return;
+        const n = applyBulk(pairs, Fill.value, clearing ? true : f.querySelector('#ow').checked);
+        closeDlg(); toast(`${n} celdas ${clearing ? 'borradas' : 'actualizadas'}`);
+      };
+    });
 }
 
 function studentDialog(sid) {
@@ -721,13 +861,50 @@ function init() {
   $('#menu').addEventListener('click', e => { const b = e.target.closest('button'); if (b) onMenu(b.dataset.act); });
   $('#fileJson').onchange = e => { if (e.target.files[0]) doImportJson(e.target.files[0]); e.target.value = ''; };
 
-  $('#main').addEventListener('click', e => {
+  const mainEl = $('#main');
+  $('#dlg').addEventListener('close', () => { if (!$('#dlg').open) { mainEl.style.paddingBottom = ''; document.body.classList.remove('sheet-open'); } });
+  mainEl.addEventListener('input', e => {
+    if (e.target.id !== 'fillv') return;
+    const v = e.target.value.trim();
+    if (v) { Fill.value = v; Fill.pick = false; refreshBar(); }
+  });
+  // arrastrar con el mouse para pintar varias celdas (en pantallas táctiles se toca celda por celda)
+  mainEl.addEventListener('pointerdown', e => {
+    if (!Fill.on || tab !== 'practicas' || Fill.pick || e.pointerType !== 'mouse' || e.button !== 0) return;
+    const td = e.target.closest('td[data-g]'); if (!td) return;
+    paint = { changed: false }; pushUndo(); paintTd(td); e.preventDefault();
+  });
+  mainEl.addEventListener('pointerover', e => {
+    if (!paint) return;
+    const td = e.target.closest('td[data-g]'); if (td) paintTd(td);
+  });
+  window.addEventListener('pointerup', () => {
+    if (!paint) return;
+    const ch = paint.changed; paint = null; lastPaint = Date.now();
+    if (ch) save(); else Fill.undo.pop();
+    render();
+  });
+
+  mainEl.addEventListener('click', e => {
     const t = e.target;
     let el;
+    if (Fill.on && tab === 'practicas') {
+      if ((el = t.closest('[data-brush]'))) {
+        const v = el.dataset.brush;
+        if (v === '__pick') Fill.pick = !Fill.pick;
+        else { Fill.pick = false; Fill.value = v === '__clear' ? '' : v; const i = $('#fillv'); if (i) i.value = ''; }
+        refreshBar(); return;
+      }
+      if (t.closest('[data-fill="undo"]')) { undoFill(); return; }
+      if ((el = t.closest('[data-g]'))) { fillCell(el); return; }
+      if ((el = t.closest('[data-hi]'))) { fillColumnDialog(el.dataset.hi); return; }
+      if ((el = t.closest('[data-row]'))) { fillRowDialog(el.dataset.row); return; }
+    }
     if ((el = t.closest('[data-a]'))) {
       const [sid, did] = el.dataset.a.split('|'), c = C();
       c.att[sid] = c.att[sid] || {};
       if (c.att[sid][did]) delete c.att[sid][did]; else c.att[sid][did] = true;
+      activeSid = sid;
       save(); render();
     } else if ((el = t.closest('[data-g]'))) {
       const [sid, iid] = el.dataset.g.split('|'); gradeDialog(sid, iid);
@@ -737,7 +914,8 @@ function init() {
     else if ((el = t.closest('[data-go]'))) { tab = el.dataset.go; render(); }
     else if ((el = t.closest('[data-act]'))) {
       const a = el.dataset.act;
-      if (a === 'add-date') addDateDialog();
+      if (a === 'fill-toggle') { Fill.on = !Fill.on; Fill.pick = false; render(); }
+      else if (a === 'add-date') addDateDialog();
       else if (a === 'add-item') itemDialog(null, el.dataset.tipo);
       else if (a === 'add-student') studentDialog(null);
       else if (a === 'paste-students') pasteDialog();

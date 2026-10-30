@@ -7,7 +7,7 @@ html,body{margin:0;height:100%;font-family:system-ui,-apple-system,"Segoe UI",Ro
 body{display:flex;flex-direction:column;height:100dvh}
 .hidden{display:none!important}
 
-.top{background:var(--green);color:#fff;padding:env(safe-area-inset-top) 10px 0}
+.top{background:var(--green);color:#fff;padding:env(safe-area-inset-top) max(10px,env(safe-area-inset-right)) 0 max(10px,env(safe-area-inset-left))}
 .top-row{display:flex;gap:8px;padding-top:8px}
 #courseSel{flex:1;font-size:16px;padding:8px;border-radius:8px;border:0;background:#fff;color:var(--text);min-width:0}
 .icon-btn{position:relative;background:rgba(255,255,255,.18);color:#fff;border:0;border-radius:8px;width:44px;font-size:22px;cursor:pointer}
@@ -87,3 +87,56 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 #btnSync[data-s=error]::after{background:#ff5252}
 #btnSync[data-s=signedout]::after{background:#fff}
 #dlgForm p{margin:0;line-height:1.45;font-size:14px}
+
+/* estudiante activo */
+.grid tbody tr.active td:not(.c-n):not(.c-name):not(.on){background:#fff1b8}
+.grid tbody tr.active td{border-top:2px solid #f9a825;border-bottom:2px solid #f9a825}
+.grid tbody tr.active td.c-n,.grid tbody tr.active td.c-name{background:#ffd54f!important;color:#000;font-weight:800}
+.grid tbody tr.active td.c-name{box-shadow:inset 5px 0 0 #e65100}
+
+/* relleno rápido */
+.btn.on{background:#e65100}
+.fillbar{background:#fff8e1;border-bottom:1px solid #f0d58a;padding:6px 10px;display:flex;flex-direction:column;gap:5px}
+.fillbar .stat{font-size:11px;line-height:1.3}
+.fillbar .quick button{flex:1 1 44px;padding:7px 4px;font-size:14px}
+.fillbar .quick button.sel{background:#e65100;border-color:#e65100;color:#fff}
+.fillrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.fillrow input{width:84px;font-size:16px;padding:7px;border:1px solid #bbb;border-radius:8px}
+.fillrow .brush{color:#e65100}
+.grid th.col[data-hi]{cursor:pointer}
+
+/* panel de calificación (deja ver la tabla) */
+dialog.sheet{position:fixed;inset:auto 0 0 0;margin:0;width:100%;max-width:100%;border-radius:14px 14px 0 0;box-shadow:0 -4px 20px rgba(0,0,0,.3);z-index:40}
+dialog.sheet #dlgForm{flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:10px max(14px,env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left))}
+dialog.sheet #dlgForm h3{flex:1 1 100%;margin:0;font-size:16px}
+dialog.sheet #dlgForm h3 small{font-weight:500;color:#1d5fa8;margin-left:6px}
+dialog.sheet #dlgForm h3 .who{background:#ffd54f;padding:2px 8px;border-radius:6px}
+dialog.sheet .quick{flex:1 1 100%}
+dialog.sheet .quick button{padding:10px 6px;flex:1 1 44px}
+dialog.sheet label{flex:1 1 130px}
+dialog.sheet .actions{margin:0}
+
+/* celular en horizontal: encabezado compacto */
+@media (max-height:500px){
+  .top{display:flex;align-items:flex-end;gap:10px}
+  .top-row{padding:6px 0;width:42%}
+  .tabs{flex:1;padding-top:6px}
+  .tabs button{padding:8px 4px;font-size:14px}
+  .toolbar{padding:5px 10px}
+  .btn{padding:7px 12px}
+  .grid thead th,.grid thead .c-n,.grid thead .c-name{height:96px}
+  .grid thead th.col span{max-height:90px}
+  .grid td.cell{height:30px}
+  .fillbar{padding:5px 10px;gap:4px}
+  .fillbar .quick button{padding:6px 4px}
+  .hint{display:none}
+  .menu{top:44px}
+  body.sheet-open .toolbar,body.sheet-open .fillbar{display:none}
+  dialog.sheet #dlgForm{gap:6px 10px;padding-top:6px;padding-bottom:calc(6px + env(safe-area-inset-bottom))}
+  dialog.sheet #dlgForm h3{flex:0 0 auto;font-size:15px}
+  dialog.sheet .quick{flex:1 1 360px}
+  dialog.sheet .quick button{padding:7px 4px;flex:1 1 36px;font-size:15px}
+  dialog.sheet label{flex:0 1 120px;font-size:11px}
+  dialog.sheet #dlgForm input{padding:6px}
+  dialog.sheet #dlgForm .btn{padding:7px 10px}
+}
