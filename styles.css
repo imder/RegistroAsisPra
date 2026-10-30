@@ -130,3 +130,17 @@ dialog.sheet #dlgForm{gap:6px;padding:8px max(12px,env(safe-area-inset-right)) c
   .gb-row .btn{padding:6px 12px}
   .gb-hint{display:none}
 }
+
+/* ordenar columnas y pegar desde Excel */
+.ro-list{max-height:52vh;overflow:auto;border:1px solid #dde3d8;border-radius:10px}
+.ro-row{display:flex;align-items:center;gap:4px;padding:5px 6px;border-bottom:1px solid #eef1ec}
+.ro-row.hl{background:#fff1b8}
+.ro-n{width:24px;text-align:center;font-weight:700;color:var(--green);font-size:13px}
+.ro-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.ro-row button{width:36px;height:34px;border:1px solid #ccc;background:#fff;border-radius:8px;font-size:15px;cursor:pointer}
+.ro-row button:disabled{opacity:.3}
+#dlgForm textarea.pt{min-height:90px;font-size:14px}
+#dlgForm label.chk{flex-direction:row;align-items:flex-start;gap:8px;font-size:13px;color:#333}
+#dlgForm label.chk input{width:auto;margin-top:2px}
+.pv{background:#f4f6f2;border-radius:8px;padding:8px;min-height:20px;line-height:1.4}
+.pv:empty{display:none}

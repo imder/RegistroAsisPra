@@ -40,6 +40,106 @@ function normalizeDB(d) {
   d.tombstones = Array.isArray(d.tombstones) ? d.tombstones : [];
   return d;
 }
+/* ---------- pegar desde Excel (lógica pura) ---------- */
+function normName(t) {
+  return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
+}
+function parsePaste(text) {
+  const rows = String(text || '').replace(/\r/g, '').split('\n').map(l => l.split('\t').map(x => x.trim()));
+  while (rows.length && rows[rows.length - 1].every(x => x === '')) rows.pop();
+  return rows;
+}
+const nameLike = v => /[A-Za-zÁÉÍÓÚÑáéíóúñ]/.test(v) && /\s/.test(v.trim()) && v.trim().length > 6;
+function detectNameCol(rows) {
+  const maxc = Math.min(3, Math.max(0, ...rows.map(r => r.length)));
+  for (let k = 0; k < maxc; k++) {
+    const vals = rows.map(r => r[k]).filter(v => v);
+    if (vals.length >= 1 && vals.filter(nameLike).length / vals.length >= 0.6) return k;
+  }
+  return -1;
+}
+function isNumbering(rows, k) {
+  const vals = rows.map(r => r[k]).filter(v => v !== undefined && v !== '');
+  return vals.length >= 2 && vals.every((v, i) => /^\d{1,3}$/.test(v) && Number(v) === Number(vals[0]) + i);
+}
+function looksLikeHeader(rows) {
+  if (rows.length < 2) return false;
+  const first = rows[0].filter(x => x);
+  if (!first.length) return false;
+  if (first.some(x => /apellid|nombre|n[°º]/i.test(x))) return true;
+  const isData = x => /^[\d.,]+$/.test(x) || /^[✓✔☑✅]/.test(x);
+  return first.every(x => !isData(x)) && rows.slice(1).some(r => r.some(isData));
+}
+const PRESENT = ['✓', '✔', '✔️', '✅', '☑', '☑️', '1', 'si', 'sí', 's', 'true', 'p', 'presente', 'asistio', 'asistió'];
+const ABSENT = ['0', 'f', 'falta', 'n', 'no', 'false', '-', '–', 'ausente'];
+function attMark(v) {
+  const t = String(v || '').trim().toLowerCase();
+  if (PRESENT.includes(t)) return true;
+  if (ABSENT.includes(t)) return false;
+  return null;
+}
+/* Calcula qué se escribiría. kind: 'att' | 'prac'. o: {header, labels, clear, startSid, startCol} */
+function planPaste(c, kind, rows, o) {
+  const cols = kind === 'att' ? c.dates : c.items;
+  let r = rows.slice();
+  if (o.header) r = r.slice(1);
+  const nameIdx = o.labels ? detectNameCol(r) : -1;
+  const lead = !o.labels ? 0 : nameIdx >= 0 ? nameIdx + 1 : (isNumbering(r, 0) ? 1 : 0);
+  const plan = { writes: [], rows: r.length, dataCols: 0, overflow: 0, unmatched: [], retired: 0, replaced: 0, unknown: 0, byName: false, matched: 0, students: 0 };
+  plan.dataCols = Math.max(0, ...r.map(x => x.length - lead));
+  const startCol = Math.max(0, cols.findIndex(x => x.id === o.startCol));
+  plan.overflow = Math.max(0, plan.dataCols - (cols.length - startCol));
+  // a qué estudiante corresponde cada fila
+  let targets = [];
+  if (nameIdx >= 0) {
+    const byKey = new Map(), byTokens = new Map();
+    c.students.forEach(s => {
+      byKey.set(normName(s.name), s);
+      byTokens.set(normName(s.name).split(' ').sort().join(' '), s);
+    });
+    targets = r.map(row => {
+      const n = row[nameIdx]; if (!n) return null;
+      const k = normName(n);
+      return byKey.get(k) || byTokens.get(k.split(' ').sort().join(' ')) || { missing: n };
+    });
+    plan.matched = targets.filter(t => t && !t.missing).length;
+    plan.byName = plan.matched > 0;
+  }
+  if (!plan.byName) {
+    const si = Math.max(0, c.students.findIndex(x => x.id === o.startSid));
+    targets = r.map((_, i) => c.students[si + i] || null);
+  }
+  const seen = new Set();
+  r.forEach((row, i) => {
+    const s = targets[i];
+    if (s && s.missing) { plan.unmatched.push(s.missing); return; }
+    if (!s) return;
+    if (s.retirado) { plan.retired++; return; }
+    seen.add(s.id);
+    for (let j = 0; j < plan.dataCols; j++) {
+      const col = cols[startCol + j]; if (!col) break;
+      const raw = (row[lead + j] || '').trim();
+      if (kind === 'prac') {
+        const cur = c.grades[s.id] && c.grades[s.id][col.id];
+        const has = cur !== undefined && cur !== '';
+        if (raw === '') { if (o.clear && has) { plan.writes.push({ sid: s.id, col: col.id, v: '' }); plan.replaced++; } continue; }
+        if (String(cur) === raw) continue;
+        if (has) plan.replaced++;
+        plan.writes.push({ sid: s.id, col: col.id, v: raw.slice(0, 12) });
+      } else {
+        const cur = !!(c.att[s.id] && c.att[s.id][col.id]);
+        let m = attMark(raw);
+        if (raw === '') { if (!o.clear) continue; m = false; }
+        if (m === null) { plan.unknown++; continue; }
+        if (m === cur) continue;
+        plan.writes.push({ sid: s.id, col: col.id, v: m });
+      }
+    }
+  });
+  plan.students = seen.size;
+  return plan;
+}
+
 function isNumeric(v) { return v !== '' && v != null && !isNaN(Number(v)); }
 
 /* cálculos (puros, reutilizados por la exportación) */
@@ -440,7 +540,8 @@ function noStudents() {
 function viewAsistencia() {
   const c = C();
   let h = `<div class="toolbar"><button class="btn" data-act="add-date">+ Fecha</button>
-    <span class="grow stat">${c.dates.length} fechas · ${c.students.filter(s => !s.retirado).length} estudiantes activos</span></div>`;
+    <button class="btn sec" data-act="paste-att">Pegar de Excel</button><button class="btn sec" data-act="reorder-dates">Ordenar</button>${undoBtn('att')}
+    <span class="grow stat hint">${c.dates.length} fechas</span></div>`;
   if (!c.students.length) return h + noStudents();
   h += `<div class="grid-wrap"><table class="grid"><thead><tr><th class="c-n corner">N°</th><th class="c-name corner">APELLIDOS Y NOMBRES</th>`;
   c.dates.forEach(d => { h += `<th class="col" data-hd="${d.id}"><span>${esc(dateLabel(d.date))}</span></th>`; });
@@ -460,6 +561,7 @@ function viewAsistencia() {
 function viewPracticas() {
   const c = C();
   let h = `<div class="toolbar"><button class="btn" data-act="add-item">+ Actividad</button>
+    <button class="btn sec" data-act="paste-prac">Pegar de Excel</button><button class="btn sec" data-act="reorder-items">Ordenar</button>${undoBtn('prac')}
     <span class="grow stat hint">${c.items.length} actividades</span></div>`;
   if (!c.students.length) return h + noStudents();
   h += `<div class="grid-wrap"><table class="grid"><thead><tr><th class="c-n corner">N°</th><th class="c-name corner">APELLIDOS Y NOMBRES</th>`;
@@ -503,7 +605,6 @@ function addDateDialog() {
     const c = C();
     if (c.dates.some(d => d.date === v)) { toast('Esa fecha ya existe'); return; }
     c.dates.push({ id: uid(), date: v });
-    c.dates.sort((a, b) => a.date.localeCompare(b.date));
     save(); closeDlg(); render();
   }
 }
@@ -534,7 +635,7 @@ function editDateDialog(did) {
   function doSave() {
     const v = $('#dv').value; if (!v) return;
     if (c.dates.some(x => x.date === v && x.id !== d.id)) { toast('Esa fecha ya existe'); return; }
-    d.date = v; c.dates.sort((a, b) => a.date.localeCompare(b.date));
+    d.date = v;
     save(); closeDlg(); render();
   }
 }
@@ -613,7 +714,7 @@ function startEdit(sid, iid) {
   if (!td) return;
   closeDlg();
   const c = C();
-  activeSid = sid;
+  activeSid = sid; anchor = { sid, col: iid };
   const cur = (c.grades[sid] && c.grades[sid][iid]) ?? '';
   td.innerHTML = `<input class="cell-in" value="${esc(cur)}" maxlength="8" autocomplete="off" enterkeyhint="next">`;
   const inp = td.firstChild;
@@ -640,6 +741,113 @@ function startEdit(sid, iid) {
   };
   inp.onblur = () => finish(false);
   inp.focus(); inp.select();
+}
+
+/* ---------- ordenar columnas ---------- */
+function reorderDialog(kind) {
+  const c = C(), arr = kind === 'dates' ? c.dates : c.items;
+  const label = x => kind === 'dates' ? dateLabel(x.date) : x.name;
+  let hl = -1;
+  openDlg(`<h3>${kind === 'dates' ? 'Ordenar fechas' : 'Ordenar actividades'}</h3>
+    <div class="stat">Mueve cada columna con las flechas: ⤒ al inicio · ▲ una antes · ▼ una después · ⤓ al final.</div>
+    <div class="ro-list" id="rol"></div>
+    <div class="actions">${kind === 'dates' ? '<button type="button" class="btn sec" id="rbd">Ordenar por fecha</button>' : ''}<button type="button" class="btn" id="cx">Listo</button></div>`,
+    f => {
+      f.querySelector('#cx').onclick = closeDlg;
+      const bd = f.querySelector('#rbd');
+      if (bd) bd.onclick = () => { arr.sort((a, b) => a.date.localeCompare(b.date)); hl = -1; save(); render(); draw(); toast('Ordenadas de la más antigua a la más reciente'); };
+      f.querySelector('#rol').onclick = e => {
+        const b = e.target.closest('button[data-m]'); if (!b) return;
+        const i = Number(b.closest('.ro-row').dataset.i);
+        const j = { top: 0, up: i - 1, down: i + 1, bot: arr.length - 1 }[b.dataset.m];
+        if (j < 0 || j >= arr.length || j === i) return;
+        const [x] = arr.splice(i, 1); arr.splice(j, 0, x);
+        hl = j; save(); render(); draw();
+      };
+      draw();
+    });
+  function draw() {
+    const box = $('#rol'), top = box.scrollTop;
+    box.innerHTML = arr.map((x, i) => `<div class="ro-row ${i === hl ? 'hl' : ''}" data-i="${i}"><span class="ro-n">${i + 1}</span><span class="ro-t">${esc(label(x))}</span>
+      <button type="button" data-m="top" ${i === 0 ? 'disabled' : ''}>⤒</button><button type="button" data-m="up" ${i === 0 ? 'disabled' : ''}>▲</button>
+      <button type="button" data-m="down" ${i === arr.length - 1 ? 'disabled' : ''}>▼</button><button type="button" data-m="bot" ${i === arr.length - 1 ? 'disabled' : ''}>⤓</button></div>`).join('') || '<div class="stat">No hay columnas.</div>';
+    box.scrollTop = top;
+    const row = box.querySelector('.ro-row.hl'); if (row) row.scrollIntoView({ block: 'nearest' });
+  }
+}
+
+/* ---------- pegar desde Excel ---------- */
+let anchor = null;          // última celda tocada: punto de partida por defecto del pegado
+let pasteUndo = null;
+const undoBtn = kind => pasteUndo && pasteUndo.kind === kind && pasteUndo.cid === db.current ? '<button class="btn sec" data-act="undo-paste">↶ Deshacer pegado</button>' : '';
+function undoPaste() {
+  const u = pasteUndo; if (!u) return;
+  const c = db.courses.find(x => x.id === u.cid); if (!c) return;
+  if (u.kind === 'att') c.att = JSON.parse(u.snap); else c.grades = JSON.parse(u.snap);
+  pasteUndo = null; save(c); render(); toast('Pegado deshecho');
+}
+function pasteGridDialog(kind, initial) {
+  const c = C(), cols = kind === 'att' ? c.dates : c.items;
+  if (!c.students.length) { toast('Primero agrega a los estudiantes'); return; }
+  if (!cols.length) { toast(kind === 'att' ? 'Primero crea las fechas con + Fecha' : 'Primero crea las actividades con + Actividad'); return; }
+  const colLabel = x => kind === 'att' ? dateLabel(x.date) : x.name;
+  const sid0 = anchor && c.students.some(s => s.id === anchor.sid) ? anchor.sid : c.students[0].id;
+  const col0 = anchor && cols.some(x => x.id === anchor.col) ? anchor.col : cols[0].id;
+  openDlg(`<h3>Pegar desde Excel</h3>
+    <div class="stat">En Excel selecciona las celdas, cópialas (Ctrl+C) y pégalas en el cuadro.${kind === 'att' ? ' Reconoce ✓, 1, Sí, P como presente y 0, F, Falta como ausente.' : ''}</div>
+    <textarea id="pt" class="pt" placeholder="Pega aquí…"></textarea>
+    <div class="row"><label>Empezar en el estudiante<select id="ps">${c.students.map((s, i) => `<option value="${s.id}" ${s.id === sid0 ? 'selected' : ''}>${i + 1} · ${esc(s.name)}</option>`).join('')}</select></label>
+    <label>Y en la columna<select id="pc">${cols.map(x => `<option value="${x.id}" ${x.id === col0 ? 'selected' : ''}>${esc(colLabel(x))}</option>`).join('')}</select></label></div>
+    <label class="chk"><input type="checkbox" id="p_lab"> Lo copiado incluye N° y nombres (se usan para ubicar a cada estudiante)</label>
+    <label class="chk"><input type="checkbox" id="p_hdr"> La primera fila son títulos (se ignora)</label>
+    <label class="chk"><input type="checkbox" id="p_clr"> Las celdas vacías borran lo que ya existe</label>
+    <div class="stat pv" id="pv"></div>
+    <div class="actions"><button type="button" class="btn sec" id="cx">Cancelar</button><button class="btn" id="ok" disabled>Pegar</button></div>`,
+    f => {
+      const q = id => f.querySelector(id);
+      let plan = null;
+      const opts = () => ({ header: q('#p_hdr').checked, labels: q('#p_lab').checked, clear: q('#p_clr').checked, startSid: q('#ps').value, startCol: q('#pc').value });
+      const refresh = () => {
+        const rows = parsePaste(q('#pt').value);
+        if (!rows.length) { q('#pv').textContent = ''; q('#ok').disabled = true; plan = null; return; }
+        plan = planPaste(c, kind, rows, opts());
+        const m = [];
+        if (plan.writes.length) m.push(`Se actualizarán ${plan.writes.length} celdas de ${plan.students} estudiantes${plan.replaced ? ` (reemplaza ${plan.replaced} existentes)` : ''}.`);
+        else m.push('No hay cambios que pegar con estas opciones.');
+        if (plan.byName) m.push(`Ubicados por nombre: ${plan.matched} de ${plan.rows}.`);
+        if (plan.unmatched.length) m.push(`Sin coincidencia: ${plan.unmatched.slice(0, 3).join(', ')}${plan.unmatched.length > 3 ? ` y ${plan.unmatched.length - 3} más` : ''}.`);
+        if (plan.retired) m.push(`${plan.retired} filas de estudiantes retirados se omiten.`);
+        if (plan.overflow) m.push(`⚠ Sobran ${plan.overflow} columnas: agrega más ${kind === 'att' ? 'fechas' : 'actividades'} o empieza en una columna anterior.`);
+        if (plan.unknown) m.push(`${plan.unknown} valores no reconocidos se omitieron.`);
+        if (!plan.byName && plan.rows + c.students.findIndex(s => s.id === q('#ps').value) > c.students.length) m.push('⚠ Hay más filas que estudiantes desde ese punto.');
+        q('#pv').innerHTML = m.map(esc).join('<br>');
+        q('#ok').disabled = !plan.writes.length;
+      };
+      q('#pt').addEventListener('input', () => {
+        const rows = parsePaste(q('#pt').value);
+        q('#p_hdr').checked = looksLikeHeader(rows);
+        q('#p_lab').checked = detectNameCol(rows.slice(looksLikeHeader(rows) ? 1 : 0)) >= 0;
+        refresh();
+      });
+      f.querySelectorAll('select,input[type=checkbox]').forEach(el => el.addEventListener('change', refresh));
+      q('#cx').onclick = closeDlg;
+      q('#ok').onclick = () => {
+        if (!plan || !plan.writes.length) return;
+        pasteUndo = { cid: c.id, kind, snap: JSON.stringify(kind === 'att' ? c.att : c.grades) };
+        plan.writes.forEach(w => {
+          if (kind === 'att') {
+            c.att[w.sid] = c.att[w.sid] || {};
+            if (w.v) c.att[w.sid][w.col] = true; else delete c.att[w.sid][w.col];
+          } else {
+            c.grades[w.sid] = c.grades[w.sid] || {};
+            if (w.v === '') delete c.grades[w.sid][w.col]; else c.grades[w.sid][w.col] = w.v;
+          }
+        });
+        save(); closeDlg(); render(); toast(`Pegado: ${plan.writes.length} celdas`);
+      };
+      if (initial) { q('#pt').value = initial; q('#pt').dispatchEvent(new Event('input')); }
+      else setTimeout(() => q('#pt').focus(), 60);
+    });
 }
 
 function studentDialog(sid) {
@@ -779,6 +987,15 @@ function init() {
 
   const mainEl = $('#main');
   $('#dlg').addEventListener('close', () => { if (!$('#dlg').open) { mainEl.style.paddingBottom = ''; document.body.classList.remove('sheet-open'); } });
+  document.addEventListener('paste', e => {
+    const tg = e.target;
+    if (tg && /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName)) return;
+    if ($('#dlg').open || (tab !== 'asistencia' && tab !== 'practicas')) return;
+    const text = (e.clipboardData && e.clipboardData.getData('text')) || '';
+    if (!text.trim()) return;
+    e.preventDefault();
+    pasteGridDialog(tab === 'asistencia' ? 'att' : 'prac', text);
+  });
   mainEl.addEventListener('click', e => {
     const t = e.target;
     let el;
@@ -787,10 +1004,11 @@ function init() {
       const [sid, did] = el.dataset.a.split('|'), c = C();
       c.att[sid] = c.att[sid] || {};
       if (c.att[sid][did]) delete c.att[sid][did]; else c.att[sid][did] = true;
-      activeSid = sid;
+      activeSid = sid; anchor = { sid, col: did };
       save(); render();
     } else if ((el = t.closest('[data-g]'))) {
       const [sid, iid] = el.dataset.g.split('|');
+      anchor = { sid, col: iid };
       const now = Date.now(), key = el.dataset.g;
       if (lastTap.key === key && now - lastTap.t < 400) { lastTap = { key: '', t: 0 }; startEdit(sid, iid); }
       else { lastTap = { key, t: now }; gradeDialog(sid, iid); }
@@ -801,6 +1019,11 @@ function init() {
     else if ((el = t.closest('[data-act]'))) {
       const a = el.dataset.act;
       if (a === 'add-date') addDateDialog();
+      else if (a === 'paste-att') pasteGridDialog('att');
+      else if (a === 'paste-prac') pasteGridDialog('prac');
+      else if (a === 'reorder-dates') reorderDialog('dates');
+      else if (a === 'reorder-items') reorderDialog('items');
+      else if (a === 'undo-paste') undoPaste();
       else if (a === 'add-item') itemDialog(null);
       else if (a === 'add-student') studentDialog(null);
       else if (a === 'paste-students') pasteDialog();
@@ -815,4 +1038,4 @@ function init() {
 }
 
 if (typeof document !== 'undefined' && document.getElementById) init();
-if (typeof module !== 'undefined') module.exports = { courseShort, buildXlsx, newCourse, attStats, average, dateLabel, normalizeDB, mergeRemote, pendingWrites, isPristine };
+if (typeof module !== 'undefined') module.exports = { parsePaste, planPaste, detectNameCol, looksLikeHeader, attMark, normName, courseShort, buildXlsx, newCourse, attStats, average, dateLabel, normalizeDB, mergeRemote, pendingWrites, isPristine };
