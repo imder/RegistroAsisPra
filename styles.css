@@ -12,9 +12,10 @@ body{display:flex;flex-direction:column;height:100dvh}
 #courseSel{flex:1;font-size:16px;padding:8px;border-radius:8px;border:0;background:#fff;color:var(--text);min-width:0}
 .icon-btn{position:relative;background:rgba(255,255,255,.18);color:#fff;border:0;border-radius:8px;width:44px;font-size:22px;cursor:pointer}
 .course-info{font-size:12px;opacity:.92;padding:6px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tabs{display:flex;gap:2px}
-.tabs button{flex:1;padding:10px 4px;background:transparent;color:#e7f3df;border:0;border-bottom:3px solid transparent;font-size:15px;font-weight:600;cursor:pointer}
-.tabs button.active{color:#fff;border-bottom-color:#fff}
+.tabs{display:flex;gap:4px;padding-top:4px}
+.tabs button{flex:1;padding:11px 4px;background:rgba(0,0,0,.22);color:#d4e6c8;border:0;border-radius:10px 10px 0 0;font-size:15px;font-weight:600;cursor:pointer;transition:background .15s}
+.tabs button:hover{background:rgba(0,0,0,.3)}
+.tabs button.active{background:#fff;color:var(--green);font-weight:800;box-shadow:0 -2px 6px rgba(0,0,0,.12)}
 
 main{flex:1;min-height:0;display:flex;flex-direction:column}
 .toolbar{display:flex;gap:8px;align-items:center;padding:8px 10px;background:#fff;border-bottom:1px solid #dde3d8;flex-wrap:wrap}

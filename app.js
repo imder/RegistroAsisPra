@@ -149,7 +149,7 @@ function sheetXml(c) {
     rows[r].cells.push({ col, val, style });
   };
   const ND = c.dates.length, NI = c.items.length;
-  const colD = 2, colSum = 2 + ND, colI = colSum + 2, colAvg = colI + NI, colEst = colAvg + 1;
+  const colD = 2, colI = 2 + ND, colEst = colI + NI;
 
   put(1, 0, c.anio, 5); put(1, 1, c.trimestre, 5);
   put(2, 0, 'UNIDAD:', 5); put(2, 1, c.unidad, 0);
@@ -162,9 +162,8 @@ function sheetXml(c) {
   rows[H] = { cells: [], ht: 105 };
   put(H, 0, 'N°', 1); put(H, 1, 'APELLIDOS Y NOMBRES', 1);
   c.dates.forEach((d, i) => put(H, colD + i, dateLabel(d.date), 6));
-  put(H, colSum, 'Asist.', 1); put(H, colSum + 1, '%', 1);
   c.items.forEach((it, i) => put(H, colI + i, it.name, it.tipo === 'inv' ? 9 : 6));
-  put(H, colAvg, 'Prom.', 1); put(H, colEst, 'Estado', 1);
+  put(H, colEst, 'Estado', 1);
 
   c.students.forEach((s, k) => {
     const r = H + 1 + k, ret = !!s.retirado;
@@ -173,16 +172,11 @@ function sheetXml(c) {
       const on = !ret && c.att[s.id] && c.att[s.id][d.id];
       put(r, colD + i, on ? '✓' : '', ret ? 3 : on ? 2 : 4);
     });
-    const st = attStats(c, s.id);
-    put(r, colSum, ret ? '' : st.n, ret ? 3 : 4);
-    put(r, colSum + 1, ret || st.pct == null ? '' : st.pct, ret ? 3 : 4);
     c.items.forEach((it, i) => {
       const v = c.grades[s.id] && c.grades[s.id][it.id];
       const has = !ret && v !== undefined && v !== '';
       put(r, colI + i, has ? (isNumeric(v) ? Number(v) : v) : '', ret ? 3 : has ? 2 : 8);
     });
-    const av = average(c, s.id);
-    put(r, colAvg, ret || av == null ? '' : av, ret ? 3 : 4);
     put(r, colEst, ret ? 'RETIRADO' : '', ret ? 3 : 4);
   });
 
@@ -199,10 +193,16 @@ function sheetXml(c) {
     });
     xml += '</row>';
   });
-  const cols = `<cols><col min="1" max="1" width="5" customWidth="1"/><col min="2" max="2" width="38" customWidth="1"/><col min="3" max="${colEst + 1}" width="5.5" customWidth="1"/></cols>`;
+  const cols = `<cols><col min="1" max="1" width="5" customWidth="1"/><col min="2" max="2" width="38" customWidth="1"/><col min="3" max="${colEst}" width="5.5" customWidth="1"/><col min="${colEst + 1}" max="${colEst + 1}" width="12" customWidth="1"/></cols>`;
   const pane = `<pane xSplit="2" ySplit="${H}" topLeftCell="C${H + 1}" activePane="bottomRight" state="frozen"/>`;
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0">${pane}</sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>${cols}<sheetData>${xml}</sheetData></worksheet>`;
+}
+function triShort(t) { const m = /^(\d)/.exec(t || ''); return m ? m[1] + 'T' : (t || ''); }
+function courseShort(c) {
+  const left = [c.grado, c.paralelo].filter(Boolean).join('');
+  const t = [left, c.nivel].filter(Boolean).join(' ');
+  return [t || 'Curso sin nombre', triShort(c.trimestre)].filter(Boolean).join('-');
 }
 function courseTitle(c) {
   const t = [c.area, [c.grado, c.paralelo].filter(Boolean).join(' ')].filter(Boolean).join(' ').trim();
@@ -386,15 +386,18 @@ function openDlg(html, bind, onEnter) {
   form.innerHTML = html;
   form.onsubmit = e => { e.preventDefault(); if (onEnter) onEnter(); };
   if (bind) bind(form);
+  // el botón Guardar es de tipo submit: su clic ya ejecuta la acción, así que se evita que además se envíe el formulario (duplicaba registros)
+  const ok = form.querySelector('#ok');
+  if (ok && ok.onclick) { const h = ok.onclick; ok.onclick = e => { e.preventDefault(); h.call(ok, e); }; }
   if (!dlg.open) dlg.showModal();
 }
 function closeDlg() { const d = $('#dlg'); if (d.open) d.close(); }
 
 function renderHeader() {
   const sel = $('#courseSel');
-  sel.innerHTML = db.courses.map(c => `<option value="${c.id}" ${c.id === db.current ? 'selected' : ''}>${esc(courseTitle(c))} · ${esc(c.trimestre)} ${esc(c.anio)}</option>`).join('');
+  sel.innerHTML = db.courses.map(c => `<option value="${c.id}" ${c.id === db.current ? 'selected' : ''}>${esc(courseShort(c))}</option>`).join('');
   const c = C();
-  const bits = [c.unidad && `"${c.unidad}"`, c.prof, c.nivel].filter(Boolean);
+  const bits = [c.prof, c.area, c.anio].filter(Boolean);
   $('#courseInfo').textContent = bits.join(' · ') || 'Toca ⋮ → Datos del curso para completar la información';
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
 }
@@ -425,15 +428,15 @@ function viewAsistencia() {
   if (!c.students.length) return h + noStudents();
   h += `<div class="grid-wrap"><table class="grid"><thead><tr><th class="c-n corner">N°</th><th class="c-name corner">APELLIDOS Y NOMBRES</th>`;
   c.dates.forEach(d => { h += `<th class="col" data-hd="${d.id}"><span>${esc(dateLabel(d.date))}</span></th>`; });
-  h += `<th class="sum">%</th></tr></thead><tbody>`;
+  h += `</tr></thead><tbody>`;
   c.students.forEach((s, k) => {
-    const ret = s.retirado, st = attStats(c, s.id);
+    const ret = s.retirado;
     h += `<tr class="${ret ? 'retirado' : ''}">${rowHead(c, s, k)}`;
     c.dates.forEach(d => {
       const on = !ret && c.att[s.id] && c.att[s.id][d.id];
       h += `<td class="cell ${on ? 'on' : ''}" ${ret ? '' : `data-a="${s.id}|${d.id}"`}>${on ? '✓' : ''}</td>`;
     });
-    h += `<td class="sum ${st.pct != null && st.pct < 50 ? 'low' : ''}">${ret || st.pct == null ? '' : st.pct + '%'}</td></tr>`;
+    h += `</tr>`;
   });
   return h + `</tbody></table></div>`;
 }
@@ -446,16 +449,16 @@ function viewPracticas() {
   if (!c.students.length) return h + noStudents();
   h += `<div class="grid-wrap"><table class="grid"><thead><tr><th class="c-n corner">N°</th><th class="c-name corner">APELLIDOS Y NOMBRES</th>`;
   c.items.forEach(it => { h += `<th class="col ${it.tipo === 'inv' ? 'inv' : 'prac'}" data-hi="${it.id}"><span>${esc(it.name)}</span></th>`; });
-  h += `<th class="sum">Prom.</th></tr></thead><tbody>`;
+  h += `</tr></thead><tbody>`;
   c.students.forEach((s, k) => {
-    const ret = s.retirado, av = average(c, s.id);
+    const ret = s.retirado;
     h += `<tr class="${ret ? 'retirado' : ''}">${rowHead(c, s, k)}`;
     c.items.forEach(it => {
       const v = c.grades[s.id] && c.grades[s.id][it.id];
       const has = !ret && v !== undefined && v !== '';
       h += `<td class="cell ${has ? 'on' : 'pend'}" ${ret ? '' : `data-g="${s.id}|${it.id}"`}>${has ? esc(v) : ''}</td>`;
     });
-    h += `<td class="sum ${av != null && av < APROBADO ? 'low' : ''}">${ret || av == null ? '' : av}</td></tr>`;
+    h += `</tr>`;
   });
   return h + `</tbody></table></div>`;
 }
@@ -631,14 +634,18 @@ function pasteDialog() {
 }
 
 function courseDialog(isNew) {
-  const c = isNew ? newCourse() : C();
+  const c = isNew ? newCourse({ unidad: 'LOS ANDES MAÑANA', area: 'COMPUTACION' }) : C();
+  const sel = (id, label, opts, cur) => {
+    const list = cur && !opts.includes(cur) ? [cur, ...opts] : opts;
+    return `<label>${label}<select id="${id}"><option value="">—</option>${list.map(o => `<option ${o === cur ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`;
+  };
   const f = (id, label, v, ph) => `<label>${label}<input id="${id}" value="${esc(v)}" placeholder="${esc(ph || '')}" autocomplete="off"></label>`;
   openDlg(`<h3>${isNew ? 'Nuevo curso' : 'Datos del curso'}</h3>
     ${f('c_unidad', 'Unidad', c.unidad, 'LOS ANDES MAÑANA')}
     ${f('c_prof', 'Profesor(a)', c.prof)}
     ${f('c_area', 'Área', c.area, 'COMPUTACIÓN')}
-    <div class="row">${f('c_grado', 'Grado', c.grado, '5°')}${f('c_par', 'Paralelo', c.paralelo, 'C')}</div>
-    ${f('c_nivel', 'Nivel', c.nivel, 'Secundaria')}
+    <div class="row">${sel('c_grado', 'Grado', ['1°', '2°', '3°', '4°', '5°', '6°'], c.grado)}${sel('c_par', 'Paralelo', ['A', 'B', 'C', 'D'], c.paralelo)}</div>
+    ${sel('c_nivel', 'Nivel', ['Primaria', 'Secundaria'], c.nivel)}
     <div class="row"><label>Trimestre<select id="c_tri">${TRIMESTRES.map(t => `<option ${t === c.trimestre ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
     ${f('c_anio', 'Año', c.anio)}</div>
     <div class="actions"><button type="button" class="btn sec" id="cx">Cancelar</button><button class="btn" id="ok">Guardar</button></div>`,
@@ -746,4 +753,4 @@ function init() {
 }
 
 if (typeof document !== 'undefined' && document.getElementById) init();
-if (typeof module !== 'undefined') module.exports = { buildXlsx, newCourse, attStats, average, dateLabel, normalizeDB, mergeRemote, pendingWrites, isPristine };
+if (typeof module !== 'undefined') module.exports = { courseShort, buildXlsx, newCourse, attStats, average, dateLabel, normalizeDB, mergeRemote, pendingWrites, isPristine };

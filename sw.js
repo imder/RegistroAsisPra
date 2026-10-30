@@ -1,4 +1,4 @@
-const CACHE = 'registro-escolar-v2';
+const CACHE = 'registro-escolar-v3';
 const ASSETS = ['./', './index.html', './styles.css', './app.js', './sync.js', './firebase-config.js', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {
