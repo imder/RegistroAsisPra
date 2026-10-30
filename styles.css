@@ -10,7 +10,7 @@ body{display:flex;flex-direction:column;height:100dvh}
 .top{background:var(--green);color:#fff;padding:env(safe-area-inset-top) 10px 0}
 .top-row{display:flex;gap:8px;padding-top:8px}
 #courseSel{flex:1;font-size:16px;padding:8px;border-radius:8px;border:0;background:#fff;color:var(--text);min-width:0}
-.icon-btn{background:rgba(255,255,255,.18);color:#fff;border:0;border-radius:8px;width:44px;font-size:22px;cursor:pointer}
+.icon-btn{position:relative;background:rgba(255,255,255,.18);color:#fff;border:0;border-radius:8px;width:44px;font-size:22px;cursor:pointer}
 .course-info{font-size:12px;opacity:.92;padding:6px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tabs{display:flex;gap:2px}
 .tabs button{flex:1;padding:10px 4px;background:transparent;color:#e7f3df;border:0;border-bottom:3px solid transparent;font-size:15px;font-weight:600;cursor:pointer}
@@ -78,3 +78,11 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   .grid{font-size:14px}
   .grid td.cell{height:30px}
 }
+
+#btnSync::after{content:"";position:absolute;right:6px;top:6px;width:10px;height:10px;border-radius:50%;background:#9aa39a;border:2px solid var(--green)}
+#btnSync[data-s=ok]::after{background:#3ddc84}
+#btnSync[data-s=syncing]::after,#btnSync[data-s=connecting]::after{background:#ffc107}
+#btnSync[data-s=offline]::after{background:#ffc107}
+#btnSync[data-s=error]::after{background:#ff5252}
+#btnSync[data-s=signedout]::after{background:#fff}
+#dlgForm p{margin:0;line-height:1.45;font-size:14px}

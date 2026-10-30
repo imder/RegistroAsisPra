@@ -20,7 +20,10 @@ La instalación como app requiere abrirla desde una dirección https. La forma m
 - **Prácticas:** *+ Práctica* / *+ Investigación*; toca una celda y elige 100, 90, 70, P, P1… o escribe otra nota. Activa *Pasar al siguiente estudiante* para llenar una columna rápido.
 - **⋮ → Exportar a Excel:** genera un .xlsx con el formato de tu planilla (una hoja por curso).
 
-## Pasar datos entre celular y computadora
+## Sincronización entre celular y computadora
+Ver **SINCRONIZACION.md** (Firebase, gratis, inicio de sesión con Google). Una vez configurada, el icono ☁ de la app muestra el estado.
+
+## Copia manual entre dispositivos
 En el dispositivo origen: **⋮ → Copia de seguridad (.json)**. En el destino: **⋮ → Restaurar copia de seguridad**. (Reemplaza los datos de ese dispositivo.)
 
 ## Importante

@@ -30,13 +30,14 @@ function newCourse(extra) {
 }
 function defaultDB() {
   const c = newCourse();
-  return { v: 1, current: c.id, courses: [c], advance: false };
+  return { v: 1, current: c.id, courses: [c], advance: false, tombstones: [] };
 }
 function normalizeDB(d) {
   if (!d || !Array.isArray(d.courses) || !d.courses.length) return defaultDB();
   d.courses = d.courses.map(c => Object.assign(newCourse(), c));
   if (!d.courses.some(c => c.id === d.current)) d.current = d.courses[0].id;
   d.advance = !!d.advance;
+  d.tombstones = Array.isArray(d.tombstones) ? d.tombstones : [];
   return d;
 }
 function isNumeric(v) { return v !== '' && v != null && !isNaN(Number(v)); }
@@ -236,11 +237,133 @@ let db;
 function load() {
   try { return normalizeDB(JSON.parse(localStorage.getItem(KEY))); } catch (e) { return defaultDB(); }
 }
-function save() {
+function persist() {
   try { localStorage.setItem(KEY, JSON.stringify(db)); }
   catch (e) { toast('No se pudo guardar: almacenamiento lleno'); }
 }
+/* save(): guarda en el dispositivo y marca el curso actual como modificado (se sube a la nube).
+   save(null): solo guarda (p. ej. cambiar de curso). save(curso): marca ese curso. */
+function save(course) {
+  const c = course === undefined ? C() : course;
+  if (c) c.updatedAt = Date.now();
+  persist();
+  if (c && typeof Sync !== 'undefined') Sync.queue();
+}
 const C = () => db.courses.find(c => c.id === db.current);
+
+/* ---------- sincronización: lógica de fusión (pura) ---------- */
+function isPristine(c) {
+  return !c.students.length && !c.dates.length && !c.items.length && !c.unidad && !c.prof && !c.area && !c.grado && !c.paralelo && !c.nivel;
+}
+/* Aplica los cursos recibidos de la nube. Gana la versión con updatedAt más reciente (por curso). */
+function mergeRemote(d, docs) {
+  let changed = false;
+  const tomb = new Map((d.tombstones || []).map(t => [t.id, t.updatedAt || 0]));
+  for (const r of docs) {
+    const local = d.courses.find(c => c.id === r.id);
+    const localTime = local ? (local.updatedAt || 0) : (tomb.get(r.id) || 0);
+    if (!(r.updatedAt > localTime)) continue;
+    if (r.deleted) {
+      if (local) { d.courses = d.courses.filter(c => c.id !== r.id); changed = true; }
+      continue;
+    }
+    let parsed;
+    try { parsed = JSON.parse(r.data); } catch (e) { continue; }
+    const c = Object.assign(newCourse(), parsed, { id: r.id, updatedAt: r.updatedAt });
+    if (local) d.courses[d.courses.indexOf(local)] = c; else d.courses.push(c);
+    changed = true;
+  }
+  if (changed) {
+    // el curso vacío de fábrica sobra cuando llegan cursos reales de la nube
+    if (d.courses.some(c => !(!c.updatedAt && isPristine(c)))) d.courses = d.courses.filter(c => c.updatedAt || !isPristine(c));
+    if (!d.courses.length) { const n = newCourse(); d.courses = [n]; }
+    if (!d.courses.some(c => c.id === d.current)) d.current = d.courses[0].id;
+  }
+  return changed;
+}
+/* Qué hay que subir: cursos nuevos o más recientes que la nube, y cursos eliminados. */
+function pendingWrites(d, remote) {
+  const out = [];
+  for (const c of d.courses) {
+    if (!c.updatedAt) { if (isPristine(c)) continue; c.updatedAt = Date.now(); }
+    const r = remote[c.id];
+    if (!r || c.updatedAt > r.updatedAt) out.push({ id: c.id, payload: { data: JSON.stringify(c), updatedAt: c.updatedAt, deleted: false } });
+  }
+  for (const t of d.tombstones || []) {
+    const r = remote[t.id];
+    if (!d.courses.some(c => c.id === t.id) && (!r || t.updatedAt > r.updatedAt)) out.push({ id: t.id, payload: { data: '', updatedAt: t.updatedAt, deleted: true } });
+  }
+  return out;
+}
+
+/* ---------- sincronización: conexión con Firebase (sync.js) ---------- */
+const Sync = {
+  tr: null, user: null, state: 'off', msg: '', ready: false, remote: {}, t: null, sent: {},
+  set(state, msg) {
+    this.state = state; this.msg = msg || '';
+    const b = typeof document !== 'undefined' && document.getElementById('btnSync');
+    if (b) { b.dataset.s = state; b.title = this.label(); }
+  },
+  label() {
+    return ({
+      off: 'Sincronización sin configurar', signedout: 'Sin iniciar sesión', connecting: 'Conectando…',
+      ok: 'Sincronizado', syncing: 'Sincronizando…', offline: 'Sin conexión: se subirá al volver', error: 'Error de sincronización'
+    })[this.state] || '';
+  },
+  async init() {
+    const cfg = window.FIREBASE_CONFIG;
+    if (!cfg || !cfg.apiKey || /^PEGA/.test(cfg.apiKey) || !cfg.projectId) { this.set('off'); return; }
+    try {
+      const m = await import('./sync.js');
+      this.tr = m.createTransport(cfg);
+    } catch (e) { this.set('error', 'No se pudo cargar Firebase. Abre la app una vez con internet.'); return; }
+    this.set('signedout');
+    this.tr.onAuth(user => {
+      this.user = user; this.ready = false; this.remote = {}; this.sent = {};
+      if (!user) { this.tr.unlisten(); this.set('signedout'); return; }
+      this.set('connecting');
+      this.tr.listen(user.uid, (docs, meta) => this.onRemote(docs, meta), err => this.set('error', err && err.message));
+    });
+  },
+  onRemote(docs, meta) {
+    this.remote = {};
+    docs.forEach(r => { this.remote[r.id] = r; });
+    if (mergeRemote(db, docs)) { persist(); render(); }
+    this.ready = true;
+    this.flush();
+    if (meta && meta.pending) this.set('syncing');
+    else if (meta && meta.fromCache && !navigator.onLine) this.set('offline');
+    else this.set('ok');
+  },
+  queue() { clearTimeout(this.t); this.t = setTimeout(() => this.flush(), 600); },
+  flush() {
+    if (!this.tr || !this.user || !this.ready) return;
+    const jobs = pendingWrites(db, this.remote);
+    for (const j of jobs) {
+      if (this.sent[j.id] === j.payload.updatedAt) continue;
+      this.sent[j.id] = j.payload.updatedAt;
+      this.set('syncing');
+      this.tr.write(this.user.uid, j.id, j.payload).catch(e => { delete this.sent[j.id]; this.set('error', e && e.message); });
+    }
+    persist();
+  },
+  dialog() {
+    const s = this.state, u = this.user;
+    let body;
+    if (s === 'off') body = `<p>La sincronización aún no está configurada. Edita el archivo <b>firebase-config.js</b> con los datos de tu proyecto Firebase (instrucciones en <b>SINCRONIZACION.md</b>) y vuelve a subir la app.</p>`;
+    else if (!u) body = `<p>Inicia sesión con tu cuenta de Google para sincronizar este dispositivo. Usa la <b>misma cuenta</b> en el celular y en la computadora.</p>${s === 'error' ? `<p class="stat">${esc(this.msg)}</p>` : ''}<div class="actions"><button type="button" class="btn" id="si">Iniciar sesión con Google</button></div>`;
+    else body = `<p>Cuenta: <b>${esc(u.email || u.displayName || '')}</b><br>Estado: <b>${esc(this.label())}</b></p>${s === 'error' ? `<p class="stat">${esc(this.msg)}</p>` : ''}<div class="actions"><button type="button" class="btn sec" id="now">Sincronizar ahora</button><button type="button" class="btn danger" id="so">Cerrar sesión</button></div>`;
+    openDlg(`<h3>Sincronización</h3>${body}<div class="actions"><button type="button" class="btn sec" id="cx">Cerrar</button></div>`, f => {
+      f.querySelector('#cx').onclick = closeDlg;
+      const si = f.querySelector('#si');
+      if (si) si.onclick = () => { closeDlg(); this.tr.signIn().catch(e => { this.set('error', e && e.message); toast('No se pudo iniciar sesión'); }); };
+      const so = f.querySelector('#so');
+      if (so) so.onclick = () => { closeDlg(); this.tr.signOut(); };
+      const now = f.querySelector('#now');
+      if (now) now.onclick = () => { this.sent = {}; this.flush(); closeDlg(); toast('Sincronizando…'); };
+    });
+  }
+};
 
 /* ---------- interfaz ---------- */
 let tab = 'asistencia';
@@ -547,7 +670,14 @@ function doImportJson(file) {
       const d = JSON.parse(r.result);
       if (!d || !Array.isArray(d.courses)) throw new Error('formato');
       if (!confirm('Esto reemplazará TODOS los datos actuales de este dispositivo. ¿Continuar?')) return;
-      db = normalizeDB(d); save(); render(); toast('Copia restaurada');
+      const oldIds = db.courses.map(c => c.id);
+      const old = db.tombstones || [];
+      db = normalizeDB(d);
+      const now = Date.now();
+      db.courses.forEach(c => { c.updatedAt = now; });
+      oldIds.filter(id => !db.courses.some(c => c.id === id)).forEach(id => db.tombstones.push({ id, updatedAt: now }));
+      old.forEach(t => { if (!db.tombstones.some(x => x.id === t.id) && !db.courses.some(c => c.id === t.id)) db.tombstones.push(t); });
+      save(null); Sync.queue(); render(); toast('Copia restaurada');
     } catch (e) { toast('Archivo no válido'); }
   };
   r.readAsText(file);
@@ -563,18 +693,21 @@ function onMenu(act) {
   else if (act === 'curso-borrar') {
     if (db.courses.length === 1) {
       if (!confirm('Es el único curso. ¿Vaciar todos sus datos?')) return;
+      db.tombstones.push({ id: db.current, updatedAt: Date.now() });
       const n = newCourse(); db.courses = [n]; db.current = n.id;
     } else {
       if (!confirm(`¿Eliminar el curso "${courseTitle(C())}" con todos sus datos?`)) return;
+      db.tombstones.push({ id: db.current, updatedAt: Date.now() });
       db.courses = db.courses.filter(c => c.id !== db.current); db.current = db.courses[0].id;
     }
-    save(); render();
+    save(null); Sync.queue(); render();
   }
 }
 
 function init() {
   db = load();
-  $('#courseSel').onchange = e => { db.current = e.target.value; save(); render(); };
+  $('#courseSel').onchange = e => { db.current = e.target.value; save(null); render(); };
+  $('#btnSync').onclick = () => Sync.dialog();
   document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { tab = b.dataset.tab; render(); });
   $('#btnMenu').onclick = e => { e.stopPropagation(); $('#menu').classList.toggle('hidden'); };
   document.addEventListener('click', e => { if (!e.target.closest('#menu')) $('#menu').classList.add('hidden'); });
@@ -606,10 +739,11 @@ function init() {
   });
 
   render();
+  Sync.init();
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 }
 
 if (typeof document !== 'undefined' && document.getElementById) init();
-if (typeof module !== 'undefined') module.exports = { buildXlsx, newCourse, attStats, average, dateLabel, normalizeDB };
+if (typeof module !== 'undefined') module.exports = { buildXlsx, newCourse, attStats, average, dateLabel, normalizeDB, mergeRemote, pendingWrites, isPristine };
