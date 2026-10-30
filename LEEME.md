@@ -17,9 +17,8 @@ La instalación como app requiere abrirla desde una dirección https. La forma m
 - **⋮ → Datos del curso:** unidad, profesor, área, grado, paralelo, nivel, trimestre.
 - **Estudiantes:** agrega uno por uno o *Pegar lista* (copia la columna de nombres desde Excel). Marca *Retirado* desde *Editar*.
 - **Asistencia:** *+ Fecha*, luego toca cada celda para marcar ✓. Toca el título de la fecha para cambiarla, marcar todos presentes o eliminarla.
-- **Prácticas:** *+ Práctica* / *+ Investigación*; toca una celda y elige 100, 90, 70, P, P1… o escribe otra nota. Activa *Pasar al siguiente estudiante* para llenar una columna rápido.
+- **Prácticas:** *+ Actividad* (eliges si es práctica o investigación). Un toque en una celda abre abajo un panel compacto con 100, 90, 80, 70, 60, 50 y ⌫ para borrar; activa *Siguiente* para pasar al siguiente estudiante. **Doble toque en una celda** para escribir otra nota directamente en ella: Enter guarda y baja al siguiente estudiante, Esc cancela, y vaciar la celda borra la nota.
 - **Estudiante resaltado:** la fila del estudiante que estás marcando o calificando se pinta de amarillo con su nombre en negrita. Al calificar, el panel de notas aparece abajo y deja ver la tabla.
-- **Relleno rápido (Prácticas):** activa el botón, elige un valor (100, 90…, o escribe otro) y toca celdas para pegarlo; con mouse puedes arrastrar. Toca el título de una columna para rellenarla entera o copiar las notas de otra columna, o toca un nombre para rellenar toda la fila. *Copiar de celda* toma el valor de una celda existente; *Deshacer* revierte el último cambio.
 - **⋮ → Exportar a Excel:** genera un .xlsx con el formato de tu planilla (una hoja por curso).
 
 ## Sincronización entre celular y computadora

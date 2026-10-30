@@ -94,27 +94,23 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .grid tbody tr.active td.c-n,.grid tbody tr.active td.c-name{background:#ffd54f!important;color:#000;font-weight:800}
 .grid tbody tr.active td.c-name{box-shadow:inset 5px 0 0 #e65100}
 
-/* relleno rápido */
-.btn.on{background:#e65100}
-.fillbar{background:#fff8e1;border-bottom:1px solid #f0d58a;padding:6px 10px;display:flex;flex-direction:column;gap:5px}
-.fillbar .stat{font-size:11px;line-height:1.3}
-.fillbar .quick button{flex:1 1 44px;padding:7px 4px;font-size:14px}
-.fillbar .quick button.sel{background:#e65100;border-color:#e65100;color:#fff}
-.fillrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.fillrow input{width:84px;font-size:16px;padding:7px;border:1px solid #bbb;border-radius:8px}
-.fillrow .brush{color:#e65100}
-.grid th.col[data-hi]{cursor:pointer}
-
-/* panel de calificación (deja ver la tabla) */
-dialog.sheet{position:fixed;inset:auto 0 0 0;margin:0;width:100%;max-width:100%;border-radius:14px 14px 0 0;box-shadow:0 -4px 20px rgba(0,0,0,.3);z-index:40}
-dialog.sheet #dlgForm{flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:10px max(14px,env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left))}
-dialog.sheet #dlgForm h3{flex:1 1 100%;margin:0;font-size:16px}
-dialog.sheet #dlgForm h3 small{font-weight:500;color:#1d5fa8;margin-left:6px}
-dialog.sheet #dlgForm h3 .who{background:#ffd54f;padding:2px 8px;border-radius:6px}
-dialog.sheet .quick{flex:1 1 100%}
-dialog.sheet .quick button{padding:10px 6px;flex:1 1 44px}
-dialog.sheet label{flex:1 1 130px}
-dialog.sheet .actions{margin:0}
+/* panel de calificación compacto (deja ver la tabla) */
+dialog.sheet{position:fixed;inset:auto 0 0 0;margin:0;width:100%;max-width:100%;border-radius:12px 12px 0 0;box-shadow:0 -4px 20px rgba(0,0,0,.3);z-index:40}
+dialog.sheet #dlgForm{gap:6px;padding:8px max(12px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+.gb-top{display:flex;align-items:center;gap:8px;min-width:0}
+.gb-top .who{background:#ffd54f;padding:3px 8px;border-radius:6px;font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto}
+.gb-top small{color:#1d5fa8;font-weight:600;white-space:nowrap;margin-right:auto}
+#dlgForm .gb-top .adv{flex-direction:row;align-items:center;gap:4px;font-size:13px;color:#333;white-space:nowrap}
+#dlgForm .gb-top .adv input{width:auto}
+.gb-top .adv input{width:auto}
+.gb-x{background:#eee;border:0;border-radius:8px;width:34px;height:32px;font-size:16px;cursor:pointer}
+.gb-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.gb-row .quick{flex:1 1 230px;flex-wrap:nowrap}
+.gb-row .quick button{flex:1 1 0;min-width:0;padding:9px 0;font-size:15px}
+.gb-row .btn{padding:8px 14px;font-size:16px}
+.gb-hint{font-size:11px;color:#666}
+.cell-in{width:100%;height:100%;min-height:30px;border:2px solid #e65100;border-radius:0;text-align:center;font:inherit;font-weight:700;padding:0;background:#fff;color:#000;outline:none}
+.grid td.cell{touch-action:manipulation}
 
 /* celular en horizontal: encabezado compacto */
 @media (max-height:500px){
@@ -127,16 +123,10 @@ dialog.sheet .actions{margin:0}
   .grid thead th,.grid thead .c-n,.grid thead .c-name{height:96px}
   .grid thead th.col span{max-height:90px}
   .grid td.cell{height:30px}
-  .fillbar{padding:5px 10px;gap:4px}
-  .fillbar .quick button{padding:6px 4px}
   .hint{display:none}
   .menu{top:44px}
-  body.sheet-open .toolbar,body.sheet-open .fillbar{display:none}
-  dialog.sheet #dlgForm{gap:6px 10px;padding-top:6px;padding-bottom:calc(6px + env(safe-area-inset-bottom))}
-  dialog.sheet #dlgForm h3{flex:0 0 auto;font-size:15px}
-  dialog.sheet .quick{flex:1 1 360px}
-  dialog.sheet .quick button{padding:7px 4px;flex:1 1 36px;font-size:15px}
-  dialog.sheet label{flex:0 1 120px;font-size:11px}
-  dialog.sheet #dlgForm input{padding:6px}
-  dialog.sheet #dlgForm .btn{padding:7px 10px}
+  body.sheet-open .toolbar{display:none}
+  .gb-row .quick button{padding:7px 0}
+  .gb-row .btn{padding:6px 12px}
+  .gb-hint{display:none}
 }
