@@ -71,10 +71,13 @@ function looksLikeHeader(rows) {
   return first.every(x => !isData(x)) && rows.slice(1).some(r => r.some(isData));
 }
 const PRESENT = ['✓', '✔', '✔️', '✅', '☑', '☑️', '1', 'si', 'sí', 's', 'true', 'p', 'presente', 'asistio', 'asistió'];
+const LICENCIA = ['l', 'lic', 'licencia'], BANDA = ['b', 'banda'];
 const ABSENT = ['0', 'f', 'falta', 'n', 'no', 'false', '-', '–', 'ausente'];
 function attMark(v) {
   const t = String(v || '').trim().toLowerCase();
   if (PRESENT.includes(t)) return true;
+  if (LICENCIA.includes(t)) return 'L';
+  if (BANDA.includes(t)) return 'B';
   if (ABSENT.includes(t)) return false;
   return null;
 }
@@ -127,7 +130,7 @@ function planPaste(c, kind, rows, o) {
         if (has) plan.replaced++;
         plan.writes.push({ sid: s.id, col: col.id, v: raw.slice(0, 12) });
       } else {
-        const cur = !!(c.att[s.id] && c.att[s.id][col.id]);
+        const cur = (c.att[s.id] && c.att[s.id][col.id]) || false;
         let m = attMark(raw);
         if (raw === '') { if (!o.clear) continue; m = false; }
         if (m === null) { plan.unknown++; continue; }
@@ -138,6 +141,14 @@ function planPaste(c, kind, rows, o) {
   });
   plan.students = seen.size;
   return plan;
+}
+
+const attGlyph = v => v === true ? '✓' : (v || '');
+const attClass = v => v === true ? 'on' : v === 'L' ? 'lic' : v === 'B' ? 'ban' : '';
+const itemLabel = it => (it.tipo === 'inv' ? '' : '🖥️ ') + it.name;   // las prácticas llevan icono de computadora
+function setAtt(c, sid, did, v) {
+  c.att[sid] = c.att[sid] || {};
+  if (v) c.att[sid][did] = v; else delete c.att[sid][did];
 }
 
 function isNumeric(v) { return v !== '' && v != null && !isNaN(Number(v)); }
@@ -218,16 +229,18 @@ function colName(i) { // 0 -> A
 const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>
-<fills count="7"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>
+<fills count="9"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FF4E7D2E"/><bgColor indexed="64"/></patternFill></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FF9FF5D0"/><bgColor indexed="64"/></patternFill></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFF4B183"/><bgColor indexed="64"/></patternFill></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFFDF3E1"/><bgColor indexed="64"/></patternFill></fill>
-<fill><patternFill patternType="solid"><fgColor rgb="FFD9D9D9"/><bgColor indexed="64"/></patternFill></fill></fills>
+<fill><patternFill patternType="solid"><fgColor rgb="FFD9D9D9"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFBDD7EE"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFFFE699"/><bgColor indexed="64"/></patternFill></fill></fills>
 <borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>
 <border><left style="thin"><color rgb="FFB9B9B9"/></left><right style="thin"><color rgb="FFB9B9B9"/></right><top style="thin"><color rgb="FFB9B9B9"/></top><bottom style="thin"><color rgb="FFB9B9B9"/></bottom><diagonal/></border></borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="10">
+<cellXfs count="12">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
 <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
 <xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
@@ -238,6 +251,8 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>
 <xf numFmtId="0" fontId="0" fillId="5" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
 <xf numFmtId="0" fontId="2" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" textRotation="90"/></xf>
+<xf numFmtId="0" fontId="0" fillId="7" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
+<xf numFmtId="0" fontId="0" fillId="8" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
 </cellXfs>
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`;
@@ -262,15 +277,15 @@ function sheetXml(c) {
   rows[H] = { cells: [], ht: 105 };
   put(H, 0, 'N°', 1); put(H, 1, 'APELLIDOS Y NOMBRES', 1);
   c.dates.forEach((d, i) => put(H, colD + i, dateLabel(d.date), 6));
-  c.items.forEach((it, i) => put(H, colI + i, it.name, it.tipo === 'inv' ? 9 : 6));
+  c.items.forEach((it, i) => put(H, colI + i, itemLabel(it), it.tipo === 'inv' ? 9 : 6));
   put(H, colEst, 'Estado', 1);
 
   c.students.forEach((s, k) => {
     const r = H + 1 + k, ret = !!s.retirado;
     put(r, 0, k + 1, ret ? 3 : 4); put(r, 1, s.name, ret ? 3 : 7);
     c.dates.forEach((d, i) => {
-      const on = !ret && c.att[s.id] && c.att[s.id][d.id];
-      put(r, colD + i, on ? '✓' : '', ret ? 3 : on ? 2 : 4);
+      const v = !ret && c.att[s.id] && c.att[s.id][d.id];
+      put(r, colD + i, attGlyph(v), ret ? 3 : v === true ? 2 : v === 'L' ? 10 : v === 'B' ? 11 : 4);
     });
     c.items.forEach((it, i) => {
       const v = c.grades[s.id] && c.grades[s.id][it.id];
@@ -550,8 +565,8 @@ function viewAsistencia() {
     const ret = s.retirado;
     h += `<tr class="${ret ? 'retirado' : s.id === activeSid ? 'active' : ''}">${rowHead(c, s, k)}`;
     c.dates.forEach(d => {
-      const on = !ret && c.att[s.id] && c.att[s.id][d.id];
-      h += `<td class="cell ${on ? 'on' : ''}" ${ret ? '' : `data-a="${s.id}|${d.id}"`}>${on ? '✓' : ''}</td>`;
+      const v = !ret && c.att[s.id] && c.att[s.id][d.id];
+      h += `<td class="cell ${attClass(v)}" ${ret ? '' : `data-a="${s.id}|${d.id}"`}>${esc(attGlyph(v))}</td>`;
     });
     h += `</tr>`;
   });
@@ -565,7 +580,7 @@ function viewPracticas() {
     <span class="grow stat hint">${c.items.length} actividades</span></div>`;
   if (!c.students.length) return h + noStudents();
   h += `<div class="grid-wrap"><table class="grid"><thead><tr><th class="c-n corner">N°</th><th class="c-name corner">APELLIDOS Y NOMBRES</th>`;
-  c.items.forEach(it => { h += `<th class="col ${it.tipo === 'inv' ? 'inv' : 'prac'}" data-hi="${it.id}"><span>${esc(it.name)}</span></th>`; });
+  c.items.forEach(it => { h += `<th class="col ${it.tipo === 'inv' ? 'inv' : 'prac'}" data-hi="${it.id}"><span>${esc(itemLabel(it))}</span></th>`; });
   h += `</tr></thead><tbody>`;
   c.students.forEach((s, k) => {
     const ret = s.retirado;
@@ -681,7 +696,7 @@ function gradeDialog(sid, iid) {
   const cur = (c.grades[sid] && c.grades[sid][iid]) ?? '';
   activeSid = sid;
   render();
-  openDlg(`<div class="gb-top"><span class="who">${c.students.indexOf(s) + 1} · ${esc(s.name)}</span><small>${esc(it.name)}</small>
+  openDlg(`<div class="gb-top"><span class="who">${c.students.indexOf(s) + 1} · ${esc(s.name)}</span><small>${esc(itemLabel(it))}</small>
       <label class="adv"><input type="checkbox" id="adv" ${db.advance ? 'checked' : ''}> Siguiente</label><button type="button" class="gb-x" id="cx" aria-label="Cerrar">✕</button></div>
     <div class="gb-row"><div class="quick">${QUICK.map(v => `<button type="button" data-v="${v}" class="${v === String(cur) ? 'sel' : ''}">${v}</button>`).join('')}</div>
     <button type="button" class="btn sec" id="clr" aria-label="Borrar nota">⌫</button></div>
@@ -709,6 +724,7 @@ function gradeDialog(sid, iid) {
 
 /* ---------- escribir la nota directamente en la celda (doble toque) ---------- */
 let lastTap = { key: '', t: 0 };
+let lastAtt = { key: '', t: 0, prev: undefined };
 function startEdit(sid, iid) {
   const td = $(`#main td[data-g="${sid}|${iid}"]`);
   if (!td) return;
@@ -743,10 +759,30 @@ function startEdit(sid, iid) {
   inp.focus(); inp.select();
 }
 
+/* ---------- asistencia: elegir L / B con doble toque ---------- */
+function attChooser(sid, did) {
+  const c = C(), s = c.students.find(x => x.id === sid), d = c.dates.find(x => x.id === did);
+  if (!s || !d) return;
+  const cur = c.att[sid] && c.att[sid][did];
+  activeSid = sid; render();
+  const opts = [['L', 'L', 'Licencia'], ['B', 'B', 'Banda'], ['✓', '✓', 'Presente'], ['', '⌫', 'Borrar']];
+  openDlg(`<div class="gb-top"><span class="who">${c.students.indexOf(s) + 1} · ${esc(s.name)}</span><small>${esc(dateLabel(d.date))}</small><span class="grow"></span><button type="button" class="gb-x" id="cx" aria-label="Cerrar">✕</button></div>
+    <div class="gb-row"><div class="quick att-q">${opts.map(([v, g, t]) => `<button type="button" data-v="${v}" class="${(v === '✓' ? cur === true : v === cur) ? 'sel' : ''}"><b>${g}</b><small>${t}</small></button>`).join('')}</div></div>`,
+    f => {
+      f.querySelector('#cx').onclick = closeDlg;
+      f.querySelectorAll('.quick button').forEach(b => b.onclick = () => {
+        const v = b.dataset.v;
+        setAtt(c, sid, did, v === '✓' ? true : v);
+        save(); render(); closeDlg();
+      });
+    }, null, true);
+  scrollToActive();
+}
+
 /* ---------- ordenar columnas ---------- */
 function reorderDialog(kind) {
   const c = C(), arr = kind === 'dates' ? c.dates : c.items;
-  const label = x => kind === 'dates' ? dateLabel(x.date) : x.name;
+  const label = x => kind === 'dates' ? dateLabel(x.date) : itemLabel(x);
   let hl = -1;
   openDlg(`<h3>${kind === 'dates' ? 'Ordenar fechas' : 'Ordenar actividades'}</h3>
     <div class="stat">Mueve cada columna con las flechas: ⤒ al inicio · ▲ una antes · ▼ una después · ⤓ al final.</div>
@@ -790,11 +826,11 @@ function pasteGridDialog(kind, initial) {
   const c = C(), cols = kind === 'att' ? c.dates : c.items;
   if (!c.students.length) { toast('Primero agrega a los estudiantes'); return; }
   if (!cols.length) { toast(kind === 'att' ? 'Primero crea las fechas con + Fecha' : 'Primero crea las actividades con + Actividad'); return; }
-  const colLabel = x => kind === 'att' ? dateLabel(x.date) : x.name;
+  const colLabel = x => kind === 'att' ? dateLabel(x.date) : itemLabel(x);
   const sid0 = anchor && c.students.some(s => s.id === anchor.sid) ? anchor.sid : c.students[0].id;
   const col0 = anchor && cols.some(x => x.id === anchor.col) ? anchor.col : cols[0].id;
   openDlg(`<h3>Pegar desde Excel</h3>
-    <div class="stat">En Excel selecciona las celdas, cópialas (Ctrl+C) y pégalas en el cuadro.${kind === 'att' ? ' Reconoce ✓, 1, Sí, P como presente y 0, F, Falta como ausente.' : ''}</div>
+    <div class="stat">En Excel selecciona las celdas, cópialas (Ctrl+C) y pégalas en el cuadro.${kind === 'att' ? ' Reconoce ✓, 1, Sí, P como presente; L como licencia; B como banda; y 0, F, Falta como ausente.' : ''}</div>
     <textarea id="pt" class="pt" placeholder="Pega aquí…"></textarea>
     <div class="row"><label>Empezar en el estudiante<select id="ps">${c.students.map((s, i) => `<option value="${s.id}" ${s.id === sid0 ? 'selected' : ''}>${i + 1} · ${esc(s.name)}</option>`).join('')}</select></label>
     <label>Y en la columna<select id="pc">${cols.map(x => `<option value="${x.id}" ${x.id === col0 ? 'selected' : ''}>${esc(colLabel(x))}</option>`).join('')}</select></label></div>
@@ -837,7 +873,7 @@ function pasteGridDialog(kind, initial) {
         plan.writes.forEach(w => {
           if (kind === 'att') {
             c.att[w.sid] = c.att[w.sid] || {};
-            if (w.v) c.att[w.sid][w.col] = true; else delete c.att[w.sid][w.col];
+            if (w.v) c.att[w.sid][w.col] = w.v; else delete c.att[w.sid][w.col];
           } else {
             c.grades[w.sid] = c.grades[w.sid] || {};
             if (w.v === '') delete c.grades[w.sid][w.col]; else c.grades[w.sid][w.col] = w.v;
@@ -1002,10 +1038,16 @@ function init() {
     if (t.closest('.cell-in')) return;
     if ((el = t.closest('[data-a]'))) {
       const [sid, did] = el.dataset.a.split('|'), c = C();
-      c.att[sid] = c.att[sid] || {};
-      if (c.att[sid][did]) delete c.att[sid][did]; else c.att[sid][did] = true;
+      const key = el.dataset.a, now = Date.now(), cur = c.att[sid] && c.att[sid][did];
       activeSid = sid; anchor = { sid, col: did };
-      save(); render();
+      if (lastAtt.key === key && now - lastAtt.t < 400) {        // doble toque: deshace el primer toque y ofrece L / B
+        setAtt(c, sid, did, lastAtt.prev); lastAtt = { key: '', t: 0, prev: undefined };
+        save(); render(); attChooser(sid, did);
+      } else {                                                    // un toque: ✓ (si ya tenía algo, se borra)
+        lastAtt = { key, t: now, prev: cur };
+        setAtt(c, sid, did, cur ? undefined : true);
+        save(); render();
+      }
     } else if ((el = t.closest('[data-g]'))) {
       const [sid, iid] = el.dataset.g.split('|');
       anchor = { sid, col: iid };
@@ -1038,4 +1080,4 @@ function init() {
 }
 
 if (typeof document !== 'undefined' && document.getElementById) init();
-if (typeof module !== 'undefined') module.exports = { parsePaste, planPaste, detectNameCol, looksLikeHeader, attMark, normName, courseShort, buildXlsx, newCourse, attStats, average, dateLabel, normalizeDB, mergeRemote, pendingWrites, isPristine };
+if (typeof module !== 'undefined') module.exports = { itemLabel, parsePaste, planPaste, detectNameCol, looksLikeHeader, attMark, normName, courseShort, buildXlsx, newCourse, attStats, average, dateLabel, normalizeDB, mergeRemote, pendingWrites, isPristine };

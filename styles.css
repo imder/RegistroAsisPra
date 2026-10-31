@@ -89,7 +89,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 #dlgForm p{margin:0;line-height:1.45;font-size:14px}
 
 /* estudiante activo */
-.grid tbody tr.active td:not(.c-n):not(.c-name):not(.on){background:#fff1b8}
+.grid tbody tr.active td:not(.c-n):not(.c-name):not(.on):not(.lic):not(.ban){background:#fff1b8}
 .grid tbody tr.active td{border-top:2px solid #f9a825;border-bottom:2px solid #f9a825}
 .grid tbody tr.active td.c-n,.grid tbody tr.active td.c-name{background:#ffd54f!important;color:#000;font-weight:800}
 .grid tbody tr.active td.c-name{box-shadow:inset 5px 0 0 #e65100}
@@ -144,3 +144,13 @@ dialog.sheet #dlgForm{gap:6px;padding:8px max(12px,env(safe-area-inset-right)) c
 #dlgForm label.chk input{width:auto;margin-top:2px}
 .pv{background:#f4f6f2;border-radius:8px;padding:8px;min-height:20px;line-height:1.4}
 .pv:empty{display:none}
+
+/* licencia / banda */
+.grid td.lic{background:#bdd7ee;color:#10456e;font-weight:800}
+.grid td.ban{background:#ffe699;color:#6b4a00;font-weight:800}
+.grid tbody tr.active td.lic{background:#bdd7ee}
+.grid tbody tr.active td.ban{background:#ffe699}
+.att-q button{display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1;padding:6px 0!important}
+.att-q button b{font-size:20px}
+.att-q button small{font-size:10px;font-weight:600}
+.gb-top .grow{flex:1}
