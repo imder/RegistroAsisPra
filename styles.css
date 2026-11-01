@@ -44,7 +44,7 @@ table.grid{border-collapse:separate;border-spacing:0;font-size:13px}
 .grid th.col.prac{background:var(--cream)}
 .grid th.sum,.grid td.sum{min-width:52px;width:52px;background:#eef2ff;font-weight:700;font-size:12px}
 .grid tr.retirado td{background:#e49edd!important;font-weight:700}
-.grid tr.retirado .c-name::after{content:"  RETIRADO";font-weight:700;color:#4a1347;font-size:11px}
+.grid .c-name .rt{font-weight:700;color:#4a1347;font-size:11px;white-space:nowrap}
 .grid td.low{color:#b3261e}
 
 .list{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:6px}
@@ -159,7 +159,9 @@ dialog.sheet #dlgForm{gap:6px;padding:8px max(12px,env(safe-area-inset-right)) c
 @media (orientation:portrait) and (max-width:700px){
   .grid .c-name .ap,.grid .c-name .no{display:block;overflow:hidden;text-overflow:ellipsis}
   .grid tbody .c-name{min-width:150px;max-width:175px;font-size:12px;line-height:1.2;padding:2px 6px}
-  .grid tr.retirado .c-name::after{display:none}
   .grid thead .c-name{min-width:150px}
 }
 .grid tbody .c-name{cursor:pointer}
+
+/* el icono de computadora se gira 180° para verse derecho en el encabezado vertical */
+.grid th.col .ic{display:inline-block;font-style:normal;transform:rotate(180deg)}

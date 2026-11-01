@@ -564,12 +564,13 @@ function splitName(full) {
   const end = w.length - e2 >= 1 ? e2 : e1;
   return [w.slice(0, end).join(' '), w.slice(end).join(' ')];
 }
-function nameHtml(n) {
+function nameHtml(n, ret) {
   const [a, b] = splitName(n);
-  return `<span class="ap">${esc(a)}</span>${b ? ` <span class="no">${esc(b)}</span>` : ''}`;
+  const tag = ret ? ' <span class="rt">(R)</span>' : '';
+  return b ? `<span class="ap">${esc(a)}</span> <span class="no">${esc(b)}${tag}</span>` : `<span class="ap">${esc(a)}${tag}</span>`;
 }
 function rowHead(c, s, k) {
-  return `<td class="c-n">${k + 1}</td><td class="c-name" ${s.retirado ? '' : `data-sid="${s.id}"`} title="${esc(s.name)}">${nameHtml(s.name)}</td>`;
+  return `<td class="c-n">${k + 1}</td><td class="c-name" ${s.retirado ? '' : `data-sid="${s.id}"`} title="${esc(s.name)}">${nameHtml(s.name, s.retirado)}</td>`;
 }
 function noStudents() {
   return `<div class="empty">Aún no hay estudiantes.<br><br><button class="btn" data-go="estudiantes">Agregar estudiantes</button></div>`;
@@ -603,7 +604,7 @@ function viewPracticas() {
     <span class="grow stat hint">${c.items.length} actividades</span></div>`;
   if (!c.students.length) return h + noStudents();
   h += `<div class="grid-wrap"><table class="grid"><thead><tr><th class="c-n corner">N°</th><th class="c-name corner">APELLIDOS Y NOMBRES</th>`;
-  c.items.forEach(it => { h += `<th class="col ${it.tipo === 'inv' ? 'inv' : 'prac'}" data-hi="${it.id}"><span>${esc(itemLabel(it))}</span></th>`; });
+  c.items.forEach(it => { h += `<th class="col ${it.tipo === 'inv' ? 'inv' : 'prac'}" data-hi="${it.id}"><span>${it.tipo === 'inv' ? '' : '<i class="ic">🖥️</i> '}${esc(it.name)}</span></th>`; });
   h += `</tr></thead><tbody>`;
   c.students.forEach((s, k) => {
     const ret = s.retirado;
@@ -624,7 +625,7 @@ function viewEstudiantes() {
     <button class="btn sec" data-act="paste-students">Pegar lista</button></div><div class="list">`;
   if (!c.students.length) h += `<div class="empty">Agrega estudiantes uno por uno, o usa <b>Pegar lista</b> para copiar la columna de nombres desde Excel o Word.</div>`;
   c.students.forEach((s, k) => {
-    h += `<div class="stu ${s.retirado ? 'ret' : ''}"><span class="n">${k + 1}</span><span class="nm">${esc(s.name)}${s.retirado ? ' <b>(RETIRADO)</b>' : ''}</span><button data-edit="${s.id}">Editar</button></div>`;
+    h += `<div class="stu ${s.retirado ? 'ret' : ''}"><span class="n">${k + 1}</span><span class="nm">${esc(s.name)}${s.retirado ? ' <b>(R)</b>' : ''}</span><button data-edit="${s.id}">Editar</button></div>`;
   });
   return h + `</div>`;
 }
