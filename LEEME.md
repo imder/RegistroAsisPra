@@ -18,10 +18,12 @@ La instalación como app requiere abrirla desde una dirección https. La forma m
 - **Estudiantes:** agrega uno por uno o *Pegar lista* (copia la columna de nombres desde Excel). Marca *Retirado* desde *Editar*.
 - **Asistencia:** *+ Fecha*, luego **un toque** en una celda marca ✓ (otro toque lo borra). **Doble toque** abre un panel para elegir **L** (licencia), **B** (banda), ✓ o borrar. Toca el título de la fecha para cambiarla, marcar todos presentes o eliminarla.
 - **Prácticas:** *+ Actividad* (eliges si es práctica o investigación; las prácticas muestran un icono 🖥️ antes del nombre). Un toque en una celda abre abajo un panel compacto con 100, 90, 80, 70, 60, 50 y ⌫ para borrar; activa *Siguiente* para pasar al siguiente estudiante. **Doble toque en una celda** para escribir otra nota directamente en ella: Enter guarda y baja al siguiente estudiante, Esc cancela, y vaciar la celda borra la nota.
-- **Estudiante resaltado:** la fila del estudiante que estás marcando o calificando se pinta de amarillo con su nombre en negrita. Al calificar, el panel de notas aparece abajo y deja ver la tabla.
+- **Estudiante resaltado:** la fila del estudiante que estás marcando o calificando se pinta de amarillo. También se resalta al tocar su nombre. Al calificar, el panel de notas aparece abajo y deja ver la tabla.
 - **Ordenar columnas:** botón *Ordenar* en Asistencia y en Prácticas. Mueve cada fecha o actividad con ⤒ ▲ ▼ ⤓ (las fechas ya no se reordenan solas; *Ordenar por fecha* lo hace si lo quieres). El Excel exportado sigue ese orden.
 - **Pegar de Excel:** botón *Pegar de Excel* (o Ctrl+V sobre la tabla en computadora). Copia las celdas en Excel y pégalas en el cuadro: empieza en la última celda que tocaste (puedes cambiar estudiante y columna). Si copiaste también N° y nombres, ubica a cada estudiante por nombre aunque el orden sea distinto. En Asistencia reconoce ✓, 1, Sí, P como presente; L como licencia; B como banda; y 0, F, Falta como ausente. Muestra una vista previa y *Deshacer pegado* revierte.
-- **⋮ → Exportar a Excel:** genera un .xlsx con el formato de tu planilla (una hoja por curso).
+- **Nombres en celular vertical:** apellidos arriba y nombres abajo (se toman los 2 primeros apellidos; reconoce DE LA, DEL, etc.). Si algún nombre queda mal separado, escríbelo con coma: `QUISPE, JUAN CARLOS`. En horizontal y en computadora se muestra en una sola línea.
+- **Retirados:** se pintan de color #E49EDD.
+- **⋮ → Exportar a Excel:** genera un .xlsx con el formato de tu planilla (una hoja por curso, con nombre como `5° A Sec` o `1° A Prim`).
 
 ## Sincronización entre celular y computadora
 Ver **SINCRONIZACION.md** (Firebase, gratis, inicio de sesión con Google). Una vez configurada, el icono ☁ de la app muestra el estado.

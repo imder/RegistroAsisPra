@@ -31,7 +31,7 @@ table.grid{border-collapse:separate;border-spacing:0;font-size:13px}
 .grid thead th{position:sticky;top:0;z-index:3;background:var(--green-l);height:120px;vertical-align:bottom}
 .grid thead th.corner{z-index:5}
 .grid .c-n{position:sticky;left:0;z-index:2;width:34px;min-width:34px;background:var(--green-l);font-weight:600}
-.grid .c-name{position:sticky;left:34px;z-index:2;min-width:190px;max-width:230px;text-align:left;padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--green-l);border-right:2px solid #7a7a7a}
+.grid .c-name{position:sticky;left:34px;z-index:2;min-width:260px;max-width:340px;text-align:left;padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--green-l);border-right:2px solid #7a7a7a}
 .grid thead .c-n,.grid thead .c-name{z-index:6;background:var(--green);color:#fff;vertical-align:middle;height:120px}
 .grid tbody tr:nth-child(even) .c-n,.grid tbody tr:nth-child(even) .c-name{background:#fff}
 .grid td.cell{min-width:40px;width:40px;height:34px;cursor:pointer;user-select:none;font-weight:600}
@@ -43,15 +43,15 @@ table.grid{border-collapse:separate;border-spacing:0;font-size:13px}
 .grid th.col.inv span{font-style:italic;color:#222}
 .grid th.col.prac{background:var(--cream)}
 .grid th.sum,.grid td.sum{min-width:52px;width:52px;background:#eef2ff;font-weight:700;font-size:12px}
-.grid tr.retirado td{background:var(--orange)!important;font-weight:700}
-.grid tr.retirado .c-name::after{content:"  RETIRADO";font-weight:700;color:#7a2e00;font-size:11px}
+.grid tr.retirado td{background:#e49edd!important;font-weight:700}
+.grid tr.retirado .c-name::after{content:"  RETIRADO";font-weight:700;color:#4a1347;font-size:11px}
 .grid td.low{color:#b3261e}
 
 .list{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:6px}
 .stu{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #dde3d8;border-radius:10px;padding:8px 10px}
 .stu .n{width:28px;font-weight:700;color:var(--green)}
 .stu .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
-.stu.ret{background:var(--orange)}
+.stu.ret{background:#e49edd}
 .stu button{background:#f1f1f1;border:0;border-radius:8px;padding:7px 10px;font-size:13px;cursor:pointer}
 .empty{margin:auto;text-align:center;color:#666;padding:24px;max-width:420px;line-height:1.5}
 
@@ -91,14 +91,14 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 /* estudiante activo */
 .grid tbody tr.active td:not(.c-n):not(.c-name):not(.on):not(.lic):not(.ban){background:#fff1b8}
 .grid tbody tr.active td{border-top:2px solid #f9a825;border-bottom:2px solid #f9a825}
-.grid tbody tr.active td.c-n,.grid tbody tr.active td.c-name{background:#ffd54f!important;color:#000;font-weight:800}
-.grid tbody tr.active td.c-name{box-shadow:inset 5px 0 0 #e65100}
+.grid tbody tr.active td.c-n,.grid tbody tr.active td.c-name{background:#ffd54f!important;color:#000}
+.grid tbody tr.active td.c-name{box-shadow:inset 5px 0 0 #e65100;font-weight:400}
 
 /* panel de calificación compacto (deja ver la tabla) */
 dialog.sheet{position:fixed;inset:auto 0 0 0;margin:0;width:100%;max-width:100%;border-radius:12px 12px 0 0;box-shadow:0 -4px 20px rgba(0,0,0,.3);z-index:40}
 dialog.sheet #dlgForm{gap:6px;padding:8px max(12px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
 .gb-top{display:flex;align-items:center;gap:8px;min-width:0}
-.gb-top .who{background:#ffd54f;padding:3px 8px;border-radius:6px;font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto}
+.gb-top .who{background:#ffd54f;padding:3px 8px;border-radius:6px;font-weight:400;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto}
 .gb-top small{color:#1d5fa8;font-weight:600;white-space:nowrap;margin-right:auto}
 #dlgForm .gb-top .adv{flex-direction:row;align-items:center;gap:4px;font-size:13px;color:#333;white-space:nowrap}
 #dlgForm .gb-top .adv input{width:auto}
@@ -120,8 +120,8 @@ dialog.sheet #dlgForm{gap:6px;padding:8px max(12px,env(safe-area-inset-right)) c
   .tabs button{padding:8px 4px;font-size:14px}
   .toolbar{padding:5px 10px}
   .btn{padding:7px 12px}
-  .grid thead th,.grid thead .c-n,.grid thead .c-name{height:96px}
-  .grid thead th.col span{max-height:90px}
+  .grid thead th,.grid thead .c-n,.grid thead .c-name{height:112px}
+  .grid thead th.col span{max-height:106px}
   .grid td.cell{height:30px}
   .hint{display:none}
   .menu{top:44px}
@@ -154,3 +154,12 @@ dialog.sheet #dlgForm{gap:6px;padding:8px max(12px,env(safe-area-inset-right)) c
 .att-q button b{font-size:20px}
 .att-q button small{font-size:10px;font-weight:600}
 .gb-top .grow{flex:1}
+
+/* apellidos arriba y nombres abajo en celular vertical; en horizontal / escritorio, en una línea */
+@media (orientation:portrait) and (max-width:700px){
+  .grid .c-name .ap,.grid .c-name .no{display:block;overflow:hidden;text-overflow:ellipsis}
+  .grid tbody .c-name{min-width:150px;max-width:175px;font-size:12px;line-height:1.2;padding:2px 6px}
+  .grid tr.retirado .c-name::after{display:none}
+  .grid thead .c-name{min-width:150px}
+}
+.grid tbody .c-name{cursor:pointer}

@@ -232,7 +232,7 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <fills count="9"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FF4E7D2E"/><bgColor indexed="64"/></patternFill></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FF9FF5D0"/><bgColor indexed="64"/></patternFill></fill>
-<fill><patternFill patternType="solid"><fgColor rgb="FFF4B183"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFE49EDD"/><bgColor indexed="64"/></patternFill></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFFDF3E1"/><bgColor indexed="64"/></patternFill></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFD9D9D9"/><bgColor indexed="64"/></patternFill></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFBDD7EE"/><bgColor indexed="64"/></patternFill></fill>
@@ -319,6 +319,10 @@ function courseShort(c) {
   const t = [left, c.nivel].filter(Boolean).join(' ');
   return [t || 'Curso sin nombre', triShort(c.trimestre)].filter(Boolean).join('-');
 }
+function sheetName(c) {
+  const lvl = { primaria: 'Prim', secundaria: 'Sec' }[String(c.nivel || '').toLowerCase()] || c.nivel;
+  return [c.grado, c.paralelo, lvl].filter(Boolean).join(' ') || 'Hoja';
+}
 function courseTitle(c) {
   const t = [c.area, [c.grado, c.paralelo].filter(Boolean).join(' ')].filter(Boolean).join(' ').trim();
   return t || 'Curso sin nombre';
@@ -326,7 +330,7 @@ function courseTitle(c) {
 function buildXlsx(courses) {
   const used = new Set();
   const names = courses.map((c, i) => {
-    let n = courseTitle(c).replace(/[\[\]:*?\/\\]/g, '-').slice(0, 28) || 'Hoja';
+    let n = sheetName(c).replace(/[\[\]:*?\/\\]/g, '-').slice(0, 28) || 'Hoja';
     let base = n, k = 2;
     while (used.has(n.toLowerCase())) n = base.slice(0, 26) + ' ' + k++;
     used.add(n.toLowerCase());
@@ -545,8 +549,27 @@ function scrollToActive() {
   if (r.top < top) wrap.scrollTop -= top - r.top + 4;
   else if (r.bottom > w.bottom) wrap.scrollTop += r.bottom - w.bottom + 4;
 }
-function rowHead(c, s, k, extra) {
-  return `<td class="c-n">${k + 1}</td><td class="c-name" ${extra || ''} title="${esc(s.name)}">${esc(s.name)}</td>`;
+/* Separa "APELLIDOS NOMBRES": por defecto los 2 primeros apellidos (con partículas DE/LA/DEL…) y el resto son nombres.
+   Si el nombre lleva una coma, manda la coma: "QUISPE, JUAN CARLOS". */
+const PARTICLES = ['DE', 'DEL', 'LA', 'LAS', 'LOS', 'SAN', 'SANTA', 'VDA', 'Y'];
+function splitName(full) {
+  const t = String(full || '').replace(/^[^A-Za-zÁÉÍÓÚÑáéíóúñ]+/, '').trim();
+  if (t.includes(',')) { const i = t.indexOf(','); return [t.slice(0, i).trim(), t.slice(i + 1).trim()]; }
+  const w = t.split(/\s+/).filter(Boolean);
+  if (w.length <= 1) return [t, ''];
+  const group = i => { let j = i; while (j < w.length - 1 && PARTICLES.includes(w[j].toUpperCase())) j++; return j + 1; };
+  const e1 = group(0);
+  if (e1 >= w.length) return [w.join(' '), ''];
+  const e2 = group(e1);
+  const end = w.length - e2 >= 1 ? e2 : e1;
+  return [w.slice(0, end).join(' '), w.slice(end).join(' ')];
+}
+function nameHtml(n) {
+  const [a, b] = splitName(n);
+  return `<span class="ap">${esc(a)}</span>${b ? ` <span class="no">${esc(b)}</span>` : ''}`;
+}
+function rowHead(c, s, k) {
+  return `<td class="c-n">${k + 1}</td><td class="c-name" ${s.retirado ? '' : `data-sid="${s.id}"`} title="${esc(s.name)}">${nameHtml(s.name)}</td>`;
 }
 function noStudents() {
   return `<div class="empty">Aún no hay estudiantes.<br><br><button class="btn" data-go="estudiantes">Agregar estudiantes</button></div>`;
@@ -1036,6 +1059,11 @@ function init() {
     const t = e.target;
     let el;
     if (t.closest('.cell-in')) return;
+    if ((el = t.closest('[data-sid]'))) {
+      closeDlg();
+      activeSid = el.dataset.sid; anchor = { sid: activeSid, col: anchor && anchor.col };
+      render(); return;
+    }
     if ((el = t.closest('[data-a]'))) {
       const [sid, did] = el.dataset.a.split('|'), c = C();
       const key = el.dataset.a, now = Date.now(), cur = c.att[sid] && c.att[sid][did];
@@ -1080,4 +1108,4 @@ function init() {
 }
 
 if (typeof document !== 'undefined' && document.getElementById) init();
-if (typeof module !== 'undefined') module.exports = { itemLabel, parsePaste, planPaste, detectNameCol, looksLikeHeader, attMark, normName, courseShort, buildXlsx, newCourse, attStats, average, dateLabel, normalizeDB, mergeRemote, pendingWrites, isPristine };
+if (typeof module !== 'undefined') module.exports = { splitName, sheetName, itemLabel, parsePaste, planPaste, detectNameCol, looksLikeHeader, attMark, normName, courseShort, buildXlsx, newCourse, attStats, average, dateLabel, normalizeDB, mergeRemote, pendingWrites, isPristine };
