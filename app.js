@@ -37,6 +37,7 @@ function normalizeDB(d) {
   d.courses = d.courses.map(c => Object.assign(newCourse(), c));
   if (!d.courses.some(c => c.id === d.current)) d.current = d.courses[0].id;
   d.advance = !!d.advance;
+  d.settings = d.settings && typeof d.settings === 'object' ? d.settings : null;
   d.tombstones = Array.isArray(d.tombstones) ? d.tombstones : [];
   return d;
 }
@@ -71,13 +72,15 @@ function looksLikeHeader(rows) {
   return first.every(x => !isData(x)) && rows.slice(1).some(r => r.some(isData));
 }
 const PRESENT = ['✓', '✔', '✔️', '✅', '☑', '☑️', '1', 'si', 'sí', 's', 'true', 'p', 'presente', 'asistio', 'asistió'];
-const LICENCIA = ['l', 'lic', 'licencia'], BANDA = ['b', 'banda'];
-const ABSENT = ['0', 'f', 'falta', 'n', 'no', 'false', '-', '–', 'ausente'];
+const LICENCIA = ['l', 'lic', 'licencia'], BANDA = ['b', 'banda'], FALTA = ['f', 'falta'], ATRASO = ['a', 'atraso', 'tarde'];
+const ABSENT = ['0', 'n', 'no', 'false', '-', '–', 'ausente'];
 function attMark(v) {
   const t = String(v || '').trim().toLowerCase();
   if (PRESENT.includes(t)) return true;
   if (LICENCIA.includes(t)) return 'L';
   if (BANDA.includes(t)) return 'B';
+  if (FALTA.includes(t)) return 'F';
+  if (ATRASO.includes(t)) return 'A';
   if (ABSENT.includes(t)) return false;
   return null;
 }
@@ -144,7 +147,7 @@ function planPaste(c, kind, rows, o) {
 }
 
 const attGlyph = v => v === true ? '✓' : (v || '');
-const attClass = v => v === true ? 'on' : v === 'L' ? 'lic' : v === 'B' ? 'ban' : '';
+const attClass = v => v === true ? 'on' : ({ L: 'lic', B: 'ban', F: 'fal', A: 'atr' }[v] || '');
 const itemLabel = it => (it.tipo === 'inv' ? '' : '🖥️ ') + it.name;   // las prácticas llevan icono de computadora
 function setAtt(c, sid, did, v) {
   c.att[sid] = c.att[sid] || {};
@@ -229,18 +232,20 @@ function colName(i) { // 0 -> A
 const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>
-<fills count="9"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>
+<fills count="11"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FF4E7D2E"/><bgColor indexed="64"/></patternFill></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FF9FF5D0"/><bgColor indexed="64"/></patternFill></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFE49EDD"/><bgColor indexed="64"/></patternFill></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFFDF3E1"/><bgColor indexed="64"/></patternFill></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFD9D9D9"/><bgColor indexed="64"/></patternFill></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFBDD7EE"/><bgColor indexed="64"/></patternFill></fill>
-<fill><patternFill patternType="solid"><fgColor rgb="FFFFE699"/><bgColor indexed="64"/></patternFill></fill></fills>
+<fill><patternFill patternType="solid"><fgColor rgb="FFFFE699"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFF4B6B6"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFF8CBAD"/><bgColor indexed="64"/></patternFill></fill></fills>
 <borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>
 <border><left style="thin"><color rgb="FFB9B9B9"/></left><right style="thin"><color rgb="FFB9B9B9"/></right><top style="thin"><color rgb="FFB9B9B9"/></top><bottom style="thin"><color rgb="FFB9B9B9"/></bottom><diagonal/></border></borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="12">
+<cellXfs count="14">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
 <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
 <xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
@@ -253,6 +258,8 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <xf numFmtId="0" fontId="2" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" textRotation="90"/></xf>
 <xf numFmtId="0" fontId="0" fillId="7" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
 <xf numFmtId="0" fontId="0" fillId="8" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
+<xf numFmtId="0" fontId="0" fillId="9" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
+<xf numFmtId="0" fontId="0" fillId="10" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
 </cellXfs>
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`;
@@ -285,7 +292,7 @@ function sheetXml(c) {
     put(r, 0, k + 1, ret ? 3 : 4); put(r, 1, s.name, ret ? 3 : 7);
     c.dates.forEach((d, i) => {
       const v = !ret && c.att[s.id] && c.att[s.id][d.id];
-      put(r, colD + i, attGlyph(v), ret ? 3 : v === true ? 2 : v === 'L' ? 10 : v === 'B' ? 11 : 4);
+      put(r, colD + i, attGlyph(v), ret ? 3 : v === true ? 2 : ({ L: 10, B: 11, F: 12, A: 13 }[v] || 4));
     });
     c.items.forEach((it, i) => {
       const v = c.grades[s.id] && c.grades[s.id][it.id];
@@ -323,6 +330,21 @@ function sheetName(c) {
   const lvl = { primaria: 'Prim', secundaria: 'Sec' }[String(c.nivel || '').toLowerCase()] || c.nivel;
   return [c.grado, c.paralelo, lvl].filter(Boolean).join(' ') || 'Hoja';
 }
+/* Primaria 1°–6°, luego Secundaria 1°–6° (y dentro de cada grado: paralelo, trimestre, año, área) */
+function courseCmp(a, b) {
+  const key = c => {
+    const nv = String(c.nivel || '').toLowerCase();
+    const g = parseInt(c.grado, 10), t = parseInt(c.trimestre, 10);
+    return [nv === 'primaria' ? 0 : nv === 'secundaria' ? 1 : 2, isNaN(g) ? 99 : g, String(c.paralelo || '~'), isNaN(t) ? 9 : t, Number(c.anio) || 0, String(c.area || '')];
+  };
+  const x = key(a), y = key(b);
+  for (let i = 0; i < x.length; i++) {
+    if (x[i] === y[i]) continue;
+    return typeof x[i] === 'number' ? x[i] - y[i] : String(x[i]).localeCompare(String(y[i]), 'es');
+  }
+  return 0;
+}
+const sortedCourses = list => list.slice().sort(courseCmp);
 function courseTitle(c) {
   const t = [c.area, [c.grado, c.paralelo].filter(Boolean).join(' ')].filter(Boolean).join(' ').trim();
   return t || 'Curso sin nombre';
@@ -371,8 +393,8 @@ function save(course) {
 const C = () => db.courses.find(c => c.id === db.current);
 
 /* ---------- sincronización: lógica de fusión (pura) ---------- */
-function isPristine(c) {
-  return !c.students.length && !c.dates.length && !c.items.length && !c.unidad && !c.prof && !c.area && !c.grado && !c.paralelo && !c.nivel;
+function isPristine(c) {   // curso vacío (los datos generales no cuentan)
+  return !c.students.length && !c.dates.length && !c.items.length && !c.grado && !c.paralelo && !c.nivel;
 }
 /* Aplica los cursos recibidos de la nube. Gana la versión con updatedAt más reciente (por curso). */
 function mergeRemote(d, docs) {
@@ -525,7 +547,7 @@ function closeDlg() { const d = $('#dlg'); if (d.open) d.close(); }
 
 function renderHeader() {
   const sel = $('#courseSel');
-  sel.innerHTML = db.courses.map(c => `<option value="${c.id}" ${c.id === db.current ? 'selected' : ''}>${esc(courseShort(c))}</option>`).join('');
+  sel.innerHTML = sortedCourses(db.courses).map(c => `<option value="${c.id}" ${c.id === db.current ? 'selected' : ''}>${esc(courseShort(c))}</option>`).join('');
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
 }
 
@@ -789,7 +811,7 @@ function attChooser(sid, did) {
   if (!s || !d) return;
   const cur = c.att[sid] && c.att[sid][did];
   activeSid = sid; render();
-  const opts = [['L', 'L', 'Licencia'], ['B', 'B', 'Banda'], ['✓', '✓', 'Presente'], ['', '⌫', 'Borrar']];
+  const opts = [['F', 'F', 'Falta'], ['L', 'L', 'Licencia'], ['A', 'A', 'Atraso'], ['B', 'B', 'Banda'], ['✓', '✓', 'Presente'], ['', '⌫', 'Borrar']];
   openDlg(`<div class="gb-top"><span class="who">${c.students.indexOf(s) + 1} · ${esc(s.name)}</span><small>${esc(dateLabel(d.date))}</small><span class="grow"></span><button type="button" class="gb-x" id="cx" aria-label="Cerrar">✕</button></div>
     <div class="gb-row"><div class="quick att-q">${opts.map(([v, g, t]) => `<button type="button" data-v="${v}" class="${(v === '✓' ? cur === true : v === cur) ? 'sel' : ''}"><b>${g}</b><small>${t}</small></button>`).join('')}</div></div>`,
     f => {
@@ -854,7 +876,7 @@ function pasteGridDialog(kind, initial) {
   const sid0 = anchor && c.students.some(s => s.id === anchor.sid) ? anchor.sid : c.students[0].id;
   const col0 = anchor && cols.some(x => x.id === anchor.col) ? anchor.col : cols[0].id;
   openDlg(`<h3>Pegar desde Excel</h3>
-    <div class="stat">En Excel selecciona las celdas, cópialas (Ctrl+C) y pégalas en el cuadro.${kind === 'att' ? ' Reconoce ✓, 1, Sí, P como presente; L como licencia; B como banda; y 0, F, Falta como ausente.' : ''}</div>
+    <div class="stat">En Excel selecciona las celdas, cópialas (Ctrl+C) y pégalas en el cuadro.${kind === 'att' ? ' Reconoce ✓, 1, Sí, P como presente; F falta; L licencia; A atraso; B banda; y 0 como ausente.' : ''}</div>
     <textarea id="pt" class="pt" placeholder="Pega aquí…"></textarea>
     <div class="row"><label>Empezar en el estudiante<select id="ps">${c.students.map((s, i) => `<option value="${s.id}" ${s.id === sid0 ? 'selected' : ''}>${i + 1} · ${esc(s.name)}</option>`).join('')}</select></label>
     <label>Y en la columna<select id="pc">${cols.map(x => `<option value="${x.id}" ${x.id === col0 ? 'selected' : ''}>${esc(colLabel(x))}</option>`).join('')}</select></label></div>
@@ -957,37 +979,63 @@ function pasteDialog() {
     });
 }
 
+/* ---------- datos generales (unidad, profesor, área, año): una vez para todos los cursos ---------- */
+function genDefaults() {
+  const s = db.settings;
+  if (s && (s.unidad || s.prof || s.area || s.anio)) return { unidad: s.unidad || '', prof: s.prof || '', area: s.area || '', anio: s.anio || new Date().getFullYear() };
+  const c = db.courses.find(x => x.unidad || x.prof || x.area);
+  return c ? { unidad: c.unidad, prof: c.prof, area: c.area, anio: c.anio } : { unidad: '', prof: '', area: '', anio: new Date().getFullYear() };
+}
+function generalDialog(first) {
+  const g = genDefaults();
+  if (first && !g.unidad && !g.area) { g.unidad = 'LOS ANDES MAÑANA'; g.area = 'COMPUTACION'; }
+  const f = (id, label, v) => `<label>${label}<input id="${id}" value="${esc(v)}" autocomplete="off"></label>`;
+  openDlg(`<h3>${first ? 'Configuración inicial' : 'Datos generales'}</h3>
+    <div class="stat">Se aplican a todos tus cursos, los que ya tienes y los nuevos que crees.</div>
+    ${f('g_unidad', 'Unidad', g.unidad)}${f('g_prof', 'Profesor(a)', g.prof)}${f('g_area', 'Área', g.area)}${f('g_anio', 'Año', g.anio)}
+    <div class="actions"><button type="button" class="btn sec" id="cx">${first ? 'Después' : 'Cancelar'}</button><button class="btn" id="ok">Guardar</button></div>`,
+    form => {
+      form.querySelector('#cx').onclick = () => { if (first && !db.settings) { db.settings = { asked: true }; persist(); } closeDlg(); };
+      form.querySelector('#ok').onclick = doSave;
+    }, doSave);
+  function doSave() {
+    const v = { unidad: $('#g_unidad').value.trim(), prof: $('#g_prof').value.trim(), area: $('#g_area').value.trim(), anio: Number($('#g_anio').value) || g.anio };
+    db.settings = v;
+    const now = Date.now();
+    db.courses.forEach(c => { Object.assign(c, v); if (!isPristine(c)) c.updatedAt = now; });
+    save(null); Sync.queue(); closeDlg(); render(); toast('Datos generales guardados');
+  }
+}
+
 function courseDialog(isNew) {
-  const c = isNew ? newCourse({ unidad: 'LOS ANDES MAÑANA', area: 'COMPUTACION' }) : C();
+  const c = isNew ? newCourse(genDefaults()) : C();
   const sel = (id, label, opts, cur) => {
     const list = cur && !opts.includes(cur) ? [cur, ...opts] : opts;
     return `<label>${label}<select id="${id}"><option value="">—</option>${list.map(o => `<option ${o === cur ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`;
   };
   const f = (id, label, v, ph) => `<label>${label}<input id="${id}" value="${esc(v)}" placeholder="${esc(ph || '')}" autocomplete="off"></label>`;
   openDlg(`<h3>${isNew ? 'Nuevo curso' : 'Datos del curso'}</h3>
-    ${f('c_unidad', 'Unidad', c.unidad, 'LOS ANDES MAÑANA')}
-    ${f('c_prof', 'Profesor(a)', c.prof)}
-    ${f('c_area', 'Área', c.area, 'COMPUTACIÓN')}
     <div class="row">${sel('c_grado', 'Grado', ['1°', '2°', '3°', '4°', '5°', '6°'], c.grado)}${sel('c_par', 'Paralelo', ['A', 'B', 'C', 'D'], c.paralelo)}</div>
     ${sel('c_nivel', 'Nivel', ['Primaria', 'Secundaria'], c.nivel)}
-    <div class="row"><label>Trimestre<select id="c_tri">${TRIMESTRES.map(t => `<option ${t === c.trimestre ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-    ${f('c_anio', 'Año', c.anio)}</div>
+    <label>Trimestre<select id="c_tri">${TRIMESTRES.map(t => `<option ${t === c.trimestre ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
     <div class="actions"><button type="button" class="btn sec" id="cx">Cancelar</button><button class="btn" id="ok">Guardar</button></div>`,
     form => {
       form.querySelector('#cx').onclick = closeDlg;
       form.querySelector('#ok').onclick = doSave;
     }, doSave);
   function doSave() {
-    c.unidad = $('#c_unidad').value.trim(); c.prof = $('#c_prof').value.trim(); c.area = $('#c_area').value.trim();
     c.grado = $('#c_grado').value.trim(); c.paralelo = $('#c_par').value.trim(); c.nivel = $('#c_nivel').value.trim();
-    c.trimestre = $('#c_tri').value; c.anio = Number($('#c_anio').value) || c.anio;
-    if (isNew) { db.courses.push(c); db.current = c.id; }
+    c.trimestre = $('#c_tri').value;
+    if (isNew) {
+      db.courses = db.courses.filter(x => x.updatedAt || !isPristine(x));   // quita el curso vacío de fábrica
+      db.courses.push(c); db.current = c.id;
+    }
     save(); closeDlg(); render();
   }
 }
 
 function doExportXlsx() {
-  download(buildXlsx(db.courses), `registro-escolar-${todayISO()}.xlsx`);
+  download(buildXlsx(sortedCourses(db.courses)), `registro-escolar-${todayISO()}.xlsx`);
   toast('Excel exportado (todos los cursos, una hoja por curso)');
 }
 function doExportJson() {
@@ -1016,7 +1064,8 @@ function doImportJson(file) {
 
 function onMenu(act) {
   $('#menu').classList.add('hidden');
-  if (act === 'curso-datos') courseDialog(false);
+  if (act === 'general') generalDialog(false);
+  else if (act === 'curso-datos') courseDialog(false);
   else if (act === 'curso-nuevo') courseDialog(true);
   else if (act === 'export-xlsx') doExportXlsx();
   else if (act === 'export-json') doExportJson();
@@ -1103,10 +1152,11 @@ function init() {
 
   render();
   Sync.init();
+  if (!db.settings && db.courses.every(isPristine)) setTimeout(() => generalDialog(true), 400);   // primera vez: pide los datos generales
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 }
 
 if (typeof document !== 'undefined' && document.getElementById) init();
-if (typeof module !== 'undefined') module.exports = { splitName, sheetName, itemLabel, parsePaste, planPaste, detectNameCol, looksLikeHeader, attMark, normName, courseShort, buildXlsx, newCourse, attStats, average, dateLabel, normalizeDB, mergeRemote, pendingWrites, isPristine };
+if (typeof module !== 'undefined') module.exports = { sortedCourses, courseCmp, splitName, sheetName, itemLabel, parsePaste, planPaste, detectNameCol, looksLikeHeader, attMark, normName, courseShort, buildXlsx, newCourse, attStats, average, dateLabel, normalizeDB, mergeRemote, pendingWrites, isPristine };

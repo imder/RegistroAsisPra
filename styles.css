@@ -89,7 +89,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 #dlgForm p{margin:0;line-height:1.45;font-size:14px}
 
 /* estudiante activo */
-.grid tbody tr.active td:not(.c-n):not(.c-name):not(.on):not(.lic):not(.ban){background:#fff1b8}
+.grid tbody tr.active td:not(.c-n):not(.c-name):not(.on):not(.lic):not(.ban):not(.fal):not(.atr){background:#fff1b8}
 .grid tbody tr.active td{border-top:2px solid #f9a825;border-bottom:2px solid #f9a825}
 .grid tbody tr.active td.c-n,.grid tbody tr.active td.c-name{background:#ffd54f!important;color:#000}
 .grid tbody tr.active td.c-name{box-shadow:inset 5px 0 0 #e65100;font-weight:400}
@@ -165,3 +165,8 @@ dialog.sheet #dlgForm{gap:6px;padding:8px max(12px,env(safe-area-inset-right)) c
 
 /* el icono de computadora se gira 180° para verse derecho en el encabezado vertical */
 .grid th.col .ic{display:inline-block;font-style:normal;transform:rotate(180deg)}
+
+/* falta / atraso */
+.grid td.fal{background:#f4b6b6;color:#8a1c1c;font-weight:800}
+.grid td.atr{background:#f8cbad;color:#7a3200;font-weight:800}
+.att-q button{font-size:13px}
