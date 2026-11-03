@@ -30,13 +30,14 @@ function newCourse(extra) {
 }
 function defaultDB() {
   const c = newCourse();
-  return { v: 1, current: c.id, courses: [c], advance: false, tombstones: [] };
+  return { v: 1, current: c.id, courses: [c], advance: false, tombstones: [], showEntrevista: true };
 }
 function normalizeDB(d) {
   if (!d || !Array.isArray(d.courses) || !d.courses.length) return defaultDB();
   d.courses = d.courses.map(c => Object.assign(newCourse(), c));
   if (!d.courses.some(c => c.id === d.current)) d.current = d.courses[0].id;
   d.advance = !!d.advance;
+  d.showEntrevista = d.showEntrevista !== false;
   d.settings = d.settings && typeof d.settings === 'object' ? d.settings : null;
   d.tombstones = Array.isArray(d.tombstones) ? d.tombstones : [];
   return d;
@@ -154,6 +155,12 @@ function setAtt(c, sid, did, v) {
   if (v) c.att[sid][did] = v; else delete c.att[sid][did];
 }
 
+const ENTREVISTA_MIN = 2;   // actividades sin nota a partir de las cuales corresponde "Entrevista"
+function missingCount(c, sid) {
+  return c.items.filter(it => { const v = c.grades[sid] && c.grades[sid][it.id]; return v === undefined || v === ''; }).length;
+}
+const needsEntrevista = (c, s) => !s.retirado && missingCount(c, s.id) >= ENTREVISTA_MIN;
+
 function isNumeric(v) { return v !== '' && v != null && !isNaN(Number(v)); }
 
 /* cálculos (puros, reutilizados por la exportación) */
@@ -232,7 +239,7 @@ function colName(i) { // 0 -> A
 const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>
-<fills count="11"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>
+<fills count="12"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FF4E7D2E"/><bgColor indexed="64"/></patternFill></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FF9FF5D0"/><bgColor indexed="64"/></patternFill></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFE49EDD"/><bgColor indexed="64"/></patternFill></fill>
@@ -241,11 +248,12 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <fill><patternFill patternType="solid"><fgColor rgb="FFBDD7EE"/><bgColor indexed="64"/></patternFill></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFFFE699"/><bgColor indexed="64"/></patternFill></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFF4B6B6"/><bgColor indexed="64"/></patternFill></fill>
-<fill><patternFill patternType="solid"><fgColor rgb="FFF8CBAD"/><bgColor indexed="64"/></patternFill></fill></fills>
+<fill><patternFill patternType="solid"><fgColor rgb="FFF8CBAD"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFFFC7CE"/><bgColor indexed="64"/></patternFill></fill></fills>
 <borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>
 <border><left style="thin"><color rgb="FFB9B9B9"/></left><right style="thin"><color rgb="FFB9B9B9"/></right><top style="thin"><color rgb="FFB9B9B9"/></top><bottom style="thin"><color rgb="FFB9B9B9"/></bottom><diagonal/></border></borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="14">
+<cellXfs count="15">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
 <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
 <xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
@@ -260,18 +268,20 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <xf numFmtId="0" fontId="0" fillId="8" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
 <xf numFmtId="0" fontId="0" fillId="9" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
 <xf numFmtId="0" fontId="0" fillId="10" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
+<xf numFmtId="0" fontId="2" fillId="11" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
 </cellXfs>
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`;
 
-function sheetXml(c) {
+function sheetXml(c, opts) {
+  const ent = !!(opts && opts.entrevista);
   const rows = []; // rows[r] = {cells:[], ht}
   const put = (r, col, val, style) => {
     rows[r] = rows[r] || { cells: [] };
     rows[r].cells.push({ col, val, style });
   };
   const ND = c.dates.length, NI = c.items.length;
-  const colD = 2, colI = 2 + ND, colEst = colI + NI;
+  const colD = 2, colI = 2 + ND, colEnt = colI + NI, colEst = colEnt + (ent ? 1 : 0);
 
   put(1, 0, c.anio, 5); put(1, 1, c.trimestre, 5);
   put(2, 0, 'UNIDAD:', 5); put(2, 1, c.unidad, 0);
@@ -285,6 +295,7 @@ function sheetXml(c) {
   put(H, 0, 'N°', 1); put(H, 1, 'APELLIDOS Y NOMBRES', 1);
   c.dates.forEach((d, i) => put(H, colD + i, dateLabel(d.date), 6));
   c.items.forEach((it, i) => put(H, colI + i, itemLabel(it), it.tipo === 'inv' ? 9 : 6));
+  if (ent) put(H, colEnt, 'ENTREVISTA', 6);
   put(H, colEst, 'Estado', 1);
 
   c.students.forEach((s, k) => {
@@ -299,6 +310,7 @@ function sheetXml(c) {
       const has = !ret && v !== undefined && v !== '';
       put(r, colI + i, has ? (isNumeric(v) ? Number(v) : v) : '', ret ? 3 : has ? 2 : 8);
     });
+    if (ent) { const fl = needsEntrevista(c, s); put(r, colEnt, fl ? 'Entrevista' : '', ret ? 3 : fl ? 14 : 4); }
     put(r, colEst, ret ? 'RETIRADO' : '', ret ? 3 : 4);
   });
 
@@ -315,7 +327,7 @@ function sheetXml(c) {
     });
     xml += '</row>';
   });
-  const cols = `<cols><col min="1" max="1" width="5" customWidth="1"/><col min="2" max="2" width="38" customWidth="1"/><col min="3" max="${colEst}" width="5.5" customWidth="1"/><col min="${colEst + 1}" max="${colEst + 1}" width="12" customWidth="1"/></cols>`;
+  const cols = `<cols><col min="1" max="1" width="5" customWidth="1"/><col min="2" max="2" width="38" customWidth="1"/><col min="3" max="${colEnt}" width="5.5" customWidth="1"/>${ent ? `<col min="${colEnt + 1}" max="${colEnt + 1}" width="12" customWidth="1"/>` : ''}<col min="${colEst + 1}" max="${colEst + 1}" width="12" customWidth="1"/></cols>`;
   const pane = `<pane xSplit="2" ySplit="${H}" topLeftCell="C${H + 1}" activePane="bottomRight" state="frozen"/>`;
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0">${pane}</sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>${cols}<sheetData>${xml}</sheetData></worksheet>`;
@@ -349,7 +361,7 @@ function courseTitle(c) {
   const t = [c.area, [c.grado, c.paralelo].filter(Boolean).join(' ')].filter(Boolean).join(' ').trim();
   return t || 'Curso sin nombre';
 }
-function buildXlsx(courses) {
+function buildXlsx(courses, opts) {
   const used = new Set();
   const names = courses.map((c, i) => {
     let n = sheetName(c).replace(/[\[\]:*?\/\\]/g, '-').slice(0, 28) || 'Hoja';
@@ -368,7 +380,7 @@ function buildXlsx(courses) {
     { name: 'xl/_rels/workbook.xml.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${courses.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${courses.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` },
     { name: 'xl/styles.xml', data: STYLES_XML },
-    ...courses.map((c, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, data: sheetXml(c) }))
+    ...courses.map((c, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, data: sheetXml(c, opts) }))
   ];
   return makeZip(files, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 }
@@ -592,7 +604,7 @@ function nameHtml(n, ret) {
   return b ? `<span class="ap">${esc(a)}</span> <span class="no">${esc(b)}${tag}</span>` : `<span class="ap">${esc(a)}${tag}</span>`;
 }
 function rowHead(c, s, k) {
-  return `<td class="c-n">${k + 1}</td><td class="c-name" ${s.retirado ? '' : `data-sid="${s.id}"`} title="${esc(s.name)}">${nameHtml(s.name, s.retirado)}</td>`;
+  return `<td class="c-n" ${s.retirado ? '' : `data-sid="${s.id}"`}>${k + 1}</td><td class="c-name" ${s.retirado ? '' : `data-sid="${s.id}"`} title="${esc(s.name)}">${nameHtml(s.name, s.retirado)}</td>`;
 }
 function noStudents() {
   return `<div class="empty">Aún no hay estudiantes.<br><br><button class="btn" data-go="estudiantes">Agregar estudiantes</button></div>`;
@@ -623,10 +635,12 @@ function viewPracticas() {
   const c = C();
   let h = `<div class="toolbar"><button class="btn" data-act="add-item">+ Actividad</button>
     <button class="btn sec" data-act="paste-prac">Pegar de Excel</button><button class="btn sec" data-act="reorder-items">Ordenar</button>${undoBtn('prac')}
-    <span class="grow stat hint">${c.items.length} actividades</span></div>`;
+    <button class="btn sec" data-act="toggle-ent">${db.showEntrevista ? 'Ocultar Entrevista' : 'Mostrar Entrevista'}</button>
+    <span class="grow stat hint">${c.items.length} actividades${db.showEntrevista ? ` · ${c.students.filter(s => needsEntrevista(c, s)).length} en entrevista` : ''}</span></div>`;
   if (!c.students.length) return h + noStudents();
   h += `<div class="grid-wrap"><table class="grid"><thead><tr><th class="c-n corner">N°</th><th class="c-name corner">APELLIDOS Y NOMBRES</th>`;
   c.items.forEach(it => { h += `<th class="col ${it.tipo === 'inv' ? 'inv' : 'prac'}" data-hi="${it.id}"><span>${it.tipo === 'inv' ? '' : '<i class="ic">🖥️</i> '}${esc(it.name)}</span></th>`; });
+  if (db.showEntrevista) h += `<th class="col ent"><span>ENTREVISTA</span></th>`;
   h += `</tr></thead><tbody>`;
   c.students.forEach((s, k) => {
     const ret = s.retirado;
@@ -636,6 +650,7 @@ function viewPracticas() {
       const has = !ret && v !== undefined && v !== '';
       h += `<td class="cell ${has ? 'on' : 'pend'}" ${ret ? '' : `data-g="${s.id}|${it.id}"`}>${has ? esc(v) : ''}</td>`;
     });
+    if (db.showEntrevista) h += needsEntrevista(c, s) ? `<td class="ent flag" title="Le faltan ${missingCount(c, s.id)} actividades">Entrevista</td>` : `<td class="ent"></td>`;
     h += `</tr>`;
   });
   return h + `</tbody></table></div>`;
@@ -647,7 +662,7 @@ function viewEstudiantes() {
     <button class="btn sec" data-act="paste-students">Pegar lista</button></div><div class="list">`;
   if (!c.students.length) h += `<div class="empty">Agrega estudiantes uno por uno, o usa <b>Pegar lista</b> para copiar la columna de nombres desde Excel o Word.</div>`;
   c.students.forEach((s, k) => {
-    h += `<div class="stu ${s.retirado ? 'ret' : ''}"><span class="n">${k + 1}</span><span class="nm">${esc(s.name)}${s.retirado ? ' <b>(R)</b>' : ''}</span><button data-edit="${s.id}">Editar</button></div>`;
+    h += `<div class="stu ${s.retirado ? 'ret' : s.id === activeSid ? 'active' : ''}" ${s.retirado ? '' : `data-sid="${s.id}"`}><span class="n">${k + 1}</span><span class="nm">${esc(s.name)}${s.retirado ? ' <b>(R)</b>' : ''}</span><button data-edit="${s.id}">Editar</button></div>`;
   });
   return h + `</div>`;
 }
@@ -1091,7 +1106,7 @@ function importDialog(sheets) {
 }
 
 function doExportXlsx() {
-  download(buildXlsx(sortedCourses(db.courses)), `registro-escolar-${todayISO()}.xlsx`);
+  download(buildXlsx(sortedCourses(db.courses), { entrevista: db.showEntrevista }), `registro-escolar-${todayISO()}.xlsx`);
   toast('Excel exportado (todos los cursos, una hoja por curso)');
 }
 function doExportJson() {
@@ -1196,7 +1211,8 @@ function init() {
     else if ((el = t.closest('[data-go]'))) { tab = el.dataset.go; render(); }
     else if ((el = t.closest('[data-act]'))) {
       const a = el.dataset.act;
-      if (a === 'add-date') addDateDialog();
+      if (a === 'toggle-ent') { db.showEntrevista = !db.showEntrevista; persist(); render(); }
+      else if (a === 'add-date') addDateDialog();
       else if (a === 'paste-att') pasteGridDialog('att');
       else if (a === 'paste-prac') pasteGridDialog('prac');
       else if (a === 'reorder-dates') reorderDialog('dates');
@@ -1217,4 +1233,4 @@ function init() {
 }
 
 if (typeof document !== 'undefined' && document.getElementById) init();
-if (typeof module !== 'undefined') module.exports = { sortedCourses, courseCmp, splitName, sheetName, itemLabel, parsePaste, planPaste, detectNameCol, looksLikeHeader, attMark, normName, courseShort, buildXlsx, newCourse, attStats, average, dateLabel, normalizeDB, mergeRemote, pendingWrites, isPristine };
+if (typeof module !== 'undefined') module.exports = { missingCount, needsEntrevista, sortedCourses, courseCmp, splitName, sheetName, itemLabel, parsePaste, planPaste, detectNameCol, looksLikeHeader, attMark, normName, courseShort, buildXlsx, newCourse, attStats, average, dateLabel, normalizeDB, mergeRemote, pendingWrites, isPristine };

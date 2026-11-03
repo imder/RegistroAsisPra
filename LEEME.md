@@ -35,3 +35,6 @@ En el dispositivo origen: **⋮ → Copia de seguridad (.json)**. En el destino:
 
 ## Importante
 Los datos viven en el navegador de cada dispositivo. Si borras los datos del navegador o desinstalas la app, se pierden: haz copias de seguridad con frecuencia.
+
+## Columna ENTREVISTA (pestaña Prácticas)
+Muestra "Entrevista" cuando al estudiante le faltan 2 o más actividades (celdas sin nota). Se oculta/muestra con el botón "Ocultar/Mostrar Entrevista" y también se incluye en el Excel exportado cuando está visible.
