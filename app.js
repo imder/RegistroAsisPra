@@ -1034,6 +1034,62 @@ function courseDialog(isNew) {
   }
 }
 
+/* ---------- importar una planilla de Excel (.xlsx) ---------- */
+async function startImportXlsx(file) {
+  let sheets;
+  try {
+    sheets = await Importer.parseWorkbook(await file.arrayBuffer(), { attMark, year: genDefaults().anio });
+  } catch (e) { toast('No se pudo leer el archivo: ' + (e.message || e)); return; }
+  if (!sheets.length) { toast('No encontré una planilla con la columna "APELLIDOS Y NOMBRES"'); return; }
+  importDialog(sheets);
+}
+const TRI_FROM = n => TRIMESTRES[Math.min(2, Math.max(0, (parseInt(n, 10) || 1) - 1))];
+function importDialog(sheets) {
+  const g = genDefaults(), hasGeneral = !!(g.unidad || g.prof || g.area);
+  const key = (i) => [i.grado, i.paralelo, i.nivel, TRI_FROM(i.trimestre), i.anio || g.anio].join('|');
+  const existing = sh => db.courses.find(c => !isPristine(c) && [c.grado, c.paralelo, c.nivel, c.trimestre, c.anio].join('|') === key(sh.info));
+  const title = sh => [courseShort(Object.assign(newCourse(), sh.info, { trimestre: TRI_FROM(sh.info.trimestre) }))].join('');
+  const first = sheets[0].info;
+  openDlg(`<h3>Importar desde Excel</h3>
+    ${sheets.map((sh, i) => `<div class="imp-card"><b>${esc(title(sh))}</b> <span class="stat">(hoja ${esc(sh.sheet)})</span>
+      <div class="stat">${sh.students.length} estudiantes (${sh.students.filter(x => x.retirado).length} retirados) · ${sh.dates.length} fechas · ${sh.items.length} actividades<br>${sh.att.length} marcas de asistencia · ${sh.grades.length} notas</div>
+      ${sh.warnings.map(w => `<div class="stat">⚠ ${esc(w)}</div>`).join('')}
+      ${existing(sh) ? `<label>Ya tienes este curso<select data-imp="${i}"><option value="new">Crear otro curso</option><option value="replace">Reemplazar el curso existente</option></select></label>` : ''}</div>`).join('')}
+    <div class="stat">Datos del archivo: ${[first.unidad, first.prof, first.area, first.anio].filter(Boolean).map(esc).join(' · ') || 'sin datos generales'}</div>
+    <label class="chk"><input type="checkbox" id="imp_gen" ${hasGeneral ? '' : 'checked'}> Usar estos datos (unidad, profesor, área, año) como Datos generales de toda la app</label>
+    <div class="actions"><button type="button" class="btn sec" id="cx">Cancelar</button><button class="btn" id="ok">Importar</button></div>`,
+    f => {
+      f.querySelector('#cx').onclick = closeDlg;
+      f.querySelector('#ok').onclick = () => {
+        const useFile = f.querySelector('#imp_gen').checked || !hasGeneral;
+        const now = Date.now();
+        if (useFile && (first.unidad || first.prof || first.area)) {
+          db.settings = { unidad: first.unidad, prof: first.prof, area: first.area, anio: first.anio || g.anio };
+          db.courses.forEach(c => { Object.assign(c, db.settings); if (!isPristine(c)) c.updatedAt = now; });
+        }
+        const gen = db.settings && (db.settings.unidad || db.settings.area) ? genDefaults() : { unidad: first.unidad, prof: first.prof, area: first.area, anio: first.anio || g.anio };
+        let last = null;
+        sheets.forEach((sh, i) => {
+          const mode = (f.querySelector(`select[data-imp="${i}"]`) || {}).value;
+          const old = mode === 'replace' ? existing(sh) : null;
+          const c = newCourse({ unidad: gen.unidad, prof: gen.prof, area: gen.area, anio: sh.info.anio || gen.anio, grado: sh.info.grado, paralelo: sh.info.paralelo, nivel: sh.info.nivel, trimestre: TRI_FROM(sh.info.trimestre) });
+          c.students = sh.students.map(x => ({ id: uid(), name: x.name, retirado: x.retirado }));
+          c.dates = sh.dates.map(x => ({ id: uid(), date: x.date }));
+          c.items = sh.items.map(x => ({ id: uid(), name: x.name, tipo: x.tipo }));
+          sh.att.forEach(a => { (c.att[c.students[a.s].id] = c.att[c.students[a.s].id] || {})[c.dates[a.d].id] = a.v; });
+          sh.grades.forEach(a => { (c.grades[c.students[a.s].id] = c.grades[c.students[a.s].id] || {})[c.items[a.i].id] = a.v; });
+          c.updatedAt = now;
+          if (old) { c.id = old.id; db.courses[db.courses.indexOf(old)] = c; }
+          else { db.courses = db.courses.filter(x => x.updatedAt || !isPristine(x)); db.courses.push(c); }
+          last = c;
+        });
+        if (last) db.current = last.id;
+        persist(); Sync.queue(); closeDlg(); render();
+        toast(`Importado: ${sheets.length} ${sheets.length === 1 ? 'curso' : 'cursos'}`);
+      };
+    });
+}
+
 function doExportXlsx() {
   download(buildXlsx(sortedCourses(db.courses)), `registro-escolar-${todayISO()}.xlsx`);
   toast('Excel exportado (todos los cursos, una hoja por curso)');
@@ -1070,6 +1126,7 @@ function onMenu(act) {
   else if (act === 'export-xlsx') doExportXlsx();
   else if (act === 'export-json') doExportJson();
   else if (act === 'import-json') $('#fileJson').click();
+  else if (act === 'import-xlsx') $('#fileXlsx').click();
   else if (act === 'curso-borrar') {
     if (db.courses.length === 1) {
       if (!confirm('Es el único curso. ¿Vaciar todos sus datos?')) return;
@@ -1092,6 +1149,7 @@ function init() {
   $('#btnMenu').onclick = e => { e.stopPropagation(); $('#menu').classList.toggle('hidden'); };
   document.addEventListener('click', e => { if (!e.target.closest('#menu')) $('#menu').classList.add('hidden'); });
   $('#menu').addEventListener('click', e => { const b = e.target.closest('button'); if (b) onMenu(b.dataset.act); });
+  $('#fileXlsx').onchange = e => { if (e.target.files[0]) startImportXlsx(e.target.files[0]); e.target.value = ''; };
   $('#fileJson').onchange = e => { if (e.target.files[0]) doImportJson(e.target.files[0]); e.target.value = ''; };
 
   const mainEl = $('#main');

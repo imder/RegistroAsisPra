@@ -30,17 +30,20 @@
   <button data-act="general">Datos generales</button>
   <button data-act="curso-datos">Datos del curso</button>
   <button data-act="curso-nuevo">Nuevo curso</button>
+  <button data-act="import-xlsx">Importar desde Excel (.xlsx)</button>
   <button data-act="export-xlsx">Exportar a Excel (.xlsx)</button>
   <button data-act="export-json">Copia de seguridad (.json)</button>
   <button data-act="import-json">Restaurar copia de seguridad</button>
   <button data-act="curso-borrar" class="danger">Eliminar este curso</button>
 </div>
 <input type="file" id="fileJson" accept=".json,application/json" hidden>
+<input type="file" id="fileXlsx" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
 
 <dialog id="dlg"><form method="dialog" id="dlgForm"></form></dialog>
 <div id="toast" class="toast hidden"></div>
 
 <script src="firebase-config.js"></script>
+<script src="importer.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

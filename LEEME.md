@@ -24,6 +24,7 @@ La instalación como app requiere abrirla desde una dirección https. La forma m
 - **Pegar de Excel:** botón *Pegar de Excel* (o Ctrl+V sobre la tabla en computadora). Copia las celdas en Excel y pégalas en el cuadro: empieza en la última celda que tocaste (puedes cambiar estudiante y columna). Si copiaste también N° y nombres, ubica a cada estudiante por nombre aunque el orden sea distinto. En Asistencia reconoce ✓, 1, Sí, P como presente; F falta; L licencia; A atraso; B banda; y 0 como ausente. Muestra una vista previa y *Deshacer pegado* revierte.
 - **Nombres en celular vertical:** apellidos arriba y nombres abajo (se toman los 2 primeros apellidos; reconoce DE LA, DEL, etc.). Si algún nombre queda mal separado, escríbelo con coma: `QUISPE, JUAN CARLOS`. En horizontal y en computadora se muestra en una sola línea.
 - **Retirados:** se pintan de color #E49EDD y llevan la etiqueta (R) junto al nombre.
+- **⋮ → Importar desde Excel (.xlsx):** lee una planilla ya llenada (estudiantes, fechas con ✓/L/B/F/A, actividades y notas, más unidad, profesor, área, grado, paralelo, nivel, trimestre y año) y crea el curso. Reconoce el formato de tu planilla y el que exporta la app. Las actividades con icono de computadora (💻/🖥️) se importan como prácticas y las demás como investigaciones. Si ya existe ese curso, puedes reemplazarlo o crear otro.
 - **⋮ → Exportar a Excel:** genera un .xlsx con el formato de tu planilla (una hoja por curso, con nombre como `5° A Sec` o `1° A Prim`).
 
 ## Sincronización entre celular y computadora
