@@ -680,7 +680,9 @@ function addDateDialog() {
     const v = $('#dv').value; if (!v) return;
     const c = C();
     if (c.dates.some(d => d.date === v)) { toast('Esa fecha ya existe'); return; }
-    c.dates.push({ id: uid(), date: v });
+    const nd = { id: uid(), date: v };
+    c.dates.push(nd);
+    c.students.forEach(st => { if (!st.retirado) (c.att[st.id] = c.att[st.id] || {})[nd.id] = true; });
     save(); closeDlg(); render();
   }
 }
@@ -1182,23 +1184,16 @@ function init() {
     const t = e.target;
     let el;
     if (t.closest('.cell-in')) return;
+    if ((el = t.closest('[data-edit]'))) { studentDialog(el.dataset.edit); return; }
     if ((el = t.closest('[data-sid]'))) {
       closeDlg();
       activeSid = el.dataset.sid; anchor = { sid: activeSid, col: anchor && anchor.col };
       render(); return;
     }
     if ((el = t.closest('[data-a]'))) {
-      const [sid, did] = el.dataset.a.split('|'), c = C();
-      const key = el.dataset.a, now = Date.now(), cur = c.att[sid] && c.att[sid][did];
+      const [sid, did] = el.dataset.a.split('|');
       activeSid = sid; anchor = { sid, col: did };
-      if (lastAtt.key === key && now - lastAtt.t < 400) {        // doble toque: deshace el primer toque y ofrece L / B
-        setAtt(c, sid, did, lastAtt.prev); lastAtt = { key: '', t: 0, prev: undefined };
-        save(); render(); attChooser(sid, did);
-      } else {                                                    // un toque: ✓ (si ya tenía algo, se borra)
-        lastAtt = { key, t: now, prev: cur };
-        setAtt(c, sid, did, cur ? undefined : true);
-        save(); render();
-      }
+      attChooser(sid, did);
     } else if ((el = t.closest('[data-g]'))) {
       const [sid, iid] = el.dataset.g.split('|');
       anchor = { sid, col: iid };
