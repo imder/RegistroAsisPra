@@ -521,7 +521,7 @@ const Sync = {
 /* ---------- interfaz ---------- */
 let tab = 'asistencia';
 let activeSid = null;                       // estudiante que se está calificando / marcando
-const QUICK = ['100', '90', '80', '70', '60', '50'];   // notas rápidas del panel de calificación
+const QUICK = ['100', '95', '90', '85', '80', '75', '70', '65', '60', '55', '45', '40', '35'];   // notas rápidas del panel de calificación
 const $ = s => document.querySelector(s);
 
 function toast(msg) {
@@ -610,21 +610,22 @@ function noStudents() {
   return `<div class="empty">Aún no hay estudiantes.<br><br><button class="btn" data-go="estudiantes">Agregar estudiantes</button></div>`;
 }
 
+const colAct = id => (anchor && anchor.col === id && activeSid ? 'ca' : '');
 function viewAsistencia() {
   const c = C();
   let h = `<div class="toolbar"><button class="btn" data-act="add-date">+ Fecha</button>
     <button class="btn sec" data-act="paste-att">Pegar de Excel</button><button class="btn sec" data-act="reorder-dates">Ordenar</button>${undoBtn('att')}
     <span class="grow stat hint">${c.dates.length} fechas</span></div>`;
   if (!c.students.length) return h + noStudents();
-  h += `<div class="grid-wrap"><table class="grid"><thead><tr><th class="c-n corner">N°</th><th class="c-name corner">APELLIDOS Y NOMBRES</th>`;
-  c.dates.forEach(d => { h += `<th class="col" data-hd="${d.id}"><span>${esc(dateLabel(d.date))}</span></th>`; });
+  h += `<div class="grid-wrap"><table class="grid att-view"><thead><tr><th class="c-n corner">N°</th><th class="c-name corner">APELLIDOS Y NOMBRES</th>`;
+  c.dates.forEach(d => { h += `<th class="col ${colAct(d.id)}" data-hd="${d.id}"><span>${esc(dateLabel(d.date))}</span></th>`; });
   h += `</tr></thead><tbody>`;
   c.students.forEach((s, k) => {
     const ret = s.retirado;
     h += `<tr class="${ret ? 'retirado' : s.id === activeSid ? 'active' : ''}">${rowHead(c, s, k)}`;
     c.dates.forEach(d => {
       const v = !ret && c.att[s.id] && c.att[s.id][d.id];
-      h += `<td class="cell ${attClass(v)}" ${ret ? '' : `data-a="${s.id}|${d.id}"`}>${esc(attGlyph(v))}</td>`;
+      h += `<td class="cell ${attClass(v)} ${colAct(d.id)}" ${ret ? '' : `data-a="${s.id}|${d.id}"`}>${esc(attGlyph(v))}</td>`;
     });
     h += `</tr>`;
   });
@@ -638,8 +639,8 @@ function viewPracticas() {
     <button class="btn sec" data-act="toggle-ent">${db.showEntrevista ? 'Ocultar Entrevista' : 'Mostrar Entrevista'}</button>
     <span class="grow stat hint">${c.items.length} actividades${db.showEntrevista ? ` · ${c.students.filter(s => needsEntrevista(c, s)).length} en entrevista` : ''}</span></div>`;
   if (!c.students.length) return h + noStudents();
-  h += `<div class="grid-wrap"><table class="grid"><thead><tr><th class="c-n corner">N°</th><th class="c-name corner">APELLIDOS Y NOMBRES</th>`;
-  c.items.forEach(it => { h += `<th class="col ${it.tipo === 'inv' ? 'inv' : 'prac'}" data-hi="${it.id}"><span>${it.tipo === 'inv' ? '' : '<i class="ic">🖥️</i> '}${esc(it.name)}</span></th>`; });
+  h += `<div class="grid-wrap"><table class="grid prac-view"><thead><tr><th class="c-n corner">N°</th><th class="c-name corner">APELLIDOS Y NOMBRES</th>`;
+  c.items.forEach(it => { h += `<th class="col ${colAct(it.id)} ${it.tipo === 'inv' ? 'inv' : 'prac'}" data-hi="${it.id}"><span>${it.tipo === 'inv' ? '' : '<i class="ic">🖥️</i> '}${esc(it.name)}</span></th>`; });
   if (db.showEntrevista) h += `<th class="col ent"><span>ENTREVISTA</span></th>`;
   h += `</tr></thead><tbody>`;
   c.students.forEach((s, k) => {
@@ -648,7 +649,7 @@ function viewPracticas() {
     c.items.forEach(it => {
       const v = c.grades[s.id] && c.grades[s.id][it.id];
       const has = !ret && v !== undefined && v !== '';
-      h += `<td class="cell ${has ? 'on' : 'pend'}" ${ret ? '' : `data-g="${s.id}|${it.id}"`}>${has ? esc(v) : ''}</td>`;
+      h += `<td class="cell ${has ? 'on' : 'pend'} ${colAct(it.id)}" ${ret ? '' : `data-g="${s.id}|${it.id}"`}>${has ? esc(v) : ''}</td>`;
     });
     if (db.showEntrevista) h += needsEntrevista(c, s) ? `<td class="ent flag" title="Le faltan ${missingCount(c, s.id)} actividades">Entrevista</td>` : `<td class="ent"></td>`;
     h += `</tr>`;
@@ -761,7 +762,7 @@ function gradeDialog(sid, iid) {
   render();
   openDlg(`<div class="gb-top"><span class="who">${c.students.indexOf(s) + 1} · ${esc(s.name)}</span><small>${esc(itemLabel(it))}</small>
       <label class="adv"><input type="checkbox" id="adv" ${db.advance ? 'checked' : ''}> Siguiente</label><button type="button" class="gb-x" id="cx" aria-label="Cerrar">✕</button></div>
-    <div class="gb-row"><div class="quick">${QUICK.map(v => `<button type="button" data-v="${v}" class="${v === String(cur) ? 'sel' : ''}">${v}</button>`).join('')}</div>
+    <div class="gb-row"><div class="quick gq">${QUICK.map(v => `<button type="button" data-v="${v}" class="${v === String(cur) ? 'sel' : ''}">${v}</button>`).join('')}</div>
     <button type="button" class="btn sec" id="clr" aria-label="Borrar nota">⌫</button></div>
     <div class="gb-hint">Para escribir otra nota: doble toque en la celda</div>`,
     f => {

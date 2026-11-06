@@ -182,3 +182,22 @@ dialog.sheet #dlgForm{gap:6px;padding:8px max(12px,env(safe-area-inset-right)) c
 .grid td.c-n[data-sid]{cursor:pointer}
 .stu[data-sid]{cursor:pointer}
 .stu.active{background:#fff1b8;box-shadow:inset 5px 0 0 #e65100}
+
+/* columna activa (asistencia: amarillo) */
+.att-view td.ca:not(.on):not(.lic):not(.ban):not(.fal):not(.atr){background:#fff1b8}
+.att-view th.col.ca{background:#ffd54f!important}
+.att-view th.col.ca span{color:#000}
+.att-view td.ca{border-left:2px solid #f9a825;border-right:2px solid #f9a825}
+/* prácticas: fila y columna en azul */
+.prac-view tbody tr.active td:not(.c-n):not(.c-name):not(.flag):not(.ent){background:#d4e9ff;border-top:2px solid #1e88e5;border-bottom:2px solid #1e88e5}
+.prac-view tbody tr.active td.c-n,.prac-view tbody tr.active td.c-name{background:#64b5f6!important;color:#000}
+.prac-view tbody tr.active td.c-name{box-shadow:inset 5px 0 0 #0d47a1}
+.prac-view td.ca:not(.flag){background:#d4e9ff;border-left:2px solid #1e88e5;border-right:2px solid #1e88e5}
+.prac-view tbody tr.active td.ca{background:#64b5f6!important;font-weight:800}
+.prac-view th.col.ca{background:#64b5f6!important}
+.prac-view th.col.ca span{color:#000}
+/* 13 notas rápidas: varias filas */
+.gb-row .quick.gq{flex-wrap:wrap}
+.gb-row .quick.gq button{flex:1 1 11%;min-width:42px;padding:8px 0;font-size:14px}
+
+.prac-view tbody tr.active td.ent:not(.flag){background:#d4e9ff}
