@@ -201,3 +201,8 @@ dialog.sheet #dlgForm{gap:6px;padding:8px max(12px,env(safe-area-inset-right)) c
 .gb-row .quick.gq button{flex:1 1 11%;min-width:42px;padding:8px 0;font-size:14px}
 
 .prac-view tbody tr.active td.ent:not(.flag){background:#d4e9ff}
+
+/* menús desplegables */
+.actsel{font-size:16px;font-weight:700;padding:9px 12px;border:1px solid var(--green);border-radius:8px;background:var(--green);color:#fff;min-width:140px}
+.actsel option{background:#fff;color:#000;font-weight:400}
+.gsel{flex:1 1 160px;font-size:20px;font-weight:700;padding:8px 10px;border:1px solid var(--green);border-radius:8px;background:#fff;color:var(--green)}

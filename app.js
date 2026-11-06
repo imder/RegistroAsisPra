@@ -610,11 +610,11 @@ function noStudents() {
   return `<div class="empty">Aún no hay estudiantes.<br><br><button class="btn" data-go="estudiantes">Agregar estudiantes</button></div>`;
 }
 
+const actMenu = opts => `<select class="actsel" data-actsel aria-label="Acciones"><option value="">Acciones ▾</option>${opts.filter(Boolean).map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>`;
 const colAct = id => (anchor && anchor.col === id && activeSid ? 'ca' : '');
 function viewAsistencia() {
   const c = C();
-  let h = `<div class="toolbar"><button class="btn" data-act="add-date">+ Fecha</button>
-    <button class="btn sec" data-act="paste-att">Pegar de Excel</button><button class="btn sec" data-act="reorder-dates">Ordenar</button>${undoBtn('att')}
+  let h = `<div class="toolbar">${actMenu([['add-date', '+ Fecha'], ['paste-att', 'Pegar de Excel'], ['reorder-dates', 'Ordenar'], undoOpt('att')])}
     <span class="grow stat hint">${c.dates.length} fechas</span></div>`;
   if (!c.students.length) return h + noStudents();
   h += `<div class="grid-wrap"><table class="grid att-view"><thead><tr><th class="c-n corner">N°</th><th class="c-name corner">APELLIDOS Y NOMBRES</th>`;
@@ -634,9 +634,7 @@ function viewAsistencia() {
 
 function viewPracticas() {
   const c = C();
-  let h = `<div class="toolbar"><button class="btn" data-act="add-item">+ Actividad</button>
-    <button class="btn sec" data-act="paste-prac">Pegar de Excel</button><button class="btn sec" data-act="reorder-items">Ordenar</button>${undoBtn('prac')}
-    <button class="btn sec" data-act="toggle-ent">${db.showEntrevista ? 'Ocultar Entrevista' : 'Mostrar Entrevista'}</button>
+  let h = `<div class="toolbar">${actMenu([['add-item', '+ Actividad'], ['paste-prac', 'Pegar de Excel'], ['reorder-items', 'Ordenar'], ['toggle-ent', db.showEntrevista ? 'Ocultar Entrevista' : 'Mostrar Entrevista'], undoOpt('prac')])}
     <span class="grow stat hint">${c.items.length} actividades${db.showEntrevista ? ` · ${c.students.filter(s => needsEntrevista(c, s)).length} en entrevista` : ''}</span></div>`;
   if (!c.students.length) return h + noStudents();
   h += `<div class="grid-wrap"><table class="grid prac-view"><thead><tr><th class="c-n corner">N°</th><th class="c-name corner">APELLIDOS Y NOMBRES</th>`;
@@ -762,12 +760,12 @@ function gradeDialog(sid, iid) {
   render();
   openDlg(`<div class="gb-top"><span class="who">${c.students.indexOf(s) + 1} · ${esc(s.name)}</span><small>${esc(itemLabel(it))}</small>
       <label class="adv"><input type="checkbox" id="adv" ${db.advance ? 'checked' : ''}> Siguiente</label><button type="button" class="gb-x" id="cx" aria-label="Cerrar">✕</button></div>
-    <div class="gb-row"><div class="quick gq">${QUICK.map(v => `<button type="button" data-v="${v}" class="${v === String(cur) ? 'sel' : ''}">${v}</button>`).join('')}</div>
+    <div class="gb-row"><select id="gsel" class="gsel" aria-label="Nota"><option value="">Nota… ▾</option>${QUICK.map(v => `<option value="${v}" ${v === String(cur) ? 'selected' : ''}>${v}</option>`).join('')}</select>
     <button type="button" class="btn sec" id="clr" aria-label="Borrar nota">⌫</button></div>
     <div class="gb-hint">Para escribir otra nota: doble toque en la celda</div>`,
     f => {
       f.querySelector('#cx').onclick = closeDlg;
-      f.querySelectorAll('.quick button').forEach(b => b.onclick = () => commit(b.dataset.v));
+      f.querySelector('#gsel').onchange = e => { if (e.target.value) commit(e.target.value); };
       f.querySelector('#clr').onclick = () => commit('');
     }, null, true);
   scrollToActive();
@@ -879,6 +877,7 @@ function reorderDialog(kind) {
 /* ---------- pegar desde Excel ---------- */
 let anchor = null;          // última celda tocada: punto de partida por defecto del pegado
 let pasteUndo = null;
+const undoOpt = kind => pasteUndo && pasteUndo.kind === kind && pasteUndo.cid === db.current ? ['undo-paste', '↶ Deshacer pegado'] : null;
 const undoBtn = kind => pasteUndo && pasteUndo.kind === kind && pasteUndo.cid === db.current ? '<button class="btn sec" data-act="undo-paste">↶ Deshacer pegado</button>' : '';
 function undoPaste() {
   const u = pasteUndo; if (!u) return;
@@ -1159,6 +1158,18 @@ function onMenu(act) {
   }
 }
 
+function runAct(a) {
+  if (a === 'toggle-ent') { db.showEntrevista = !db.showEntrevista; persist(); render(); }
+  else if (a === 'add-date') addDateDialog();
+  else if (a === 'paste-att') pasteGridDialog('att');
+  else if (a === 'paste-prac') pasteGridDialog('prac');
+  else if (a === 'reorder-dates') reorderDialog('dates');
+  else if (a === 'reorder-items') reorderDialog('items');
+  else if (a === 'undo-paste') undoPaste();
+  else if (a === 'add-item') itemDialog(null);
+  else if (a === 'add-student') studentDialog(null);
+  else if (a === 'paste-students') pasteDialog();
+}
 function init() {
   db = load();
   $('#courseSel').onchange = e => { db.current = e.target.value; save(null); render(); };
@@ -1180,6 +1191,10 @@ function init() {
     if (!text.trim()) return;
     e.preventDefault();
     pasteGridDialog(tab === 'asistencia' ? 'att' : 'prac', text);
+  });
+  mainEl.addEventListener('change', e => {
+    const t = e.target;
+    if (t.matches && t.matches('select[data-actsel]')) { const a = t.value; t.value = ''; if (a) runAct(a); }
   });
   mainEl.addEventListener('click', e => {
     const t = e.target;
@@ -1206,17 +1221,7 @@ function init() {
     else if ((el = t.closest('[data-edit]'))) studentDialog(el.dataset.edit);
     else if ((el = t.closest('[data-go]'))) { tab = el.dataset.go; render(); }
     else if ((el = t.closest('[data-act]'))) {
-      const a = el.dataset.act;
-      if (a === 'toggle-ent') { db.showEntrevista = !db.showEntrevista; persist(); render(); }
-      else if (a === 'add-date') addDateDialog();
-      else if (a === 'paste-att') pasteGridDialog('att');
-      else if (a === 'paste-prac') pasteGridDialog('prac');
-      else if (a === 'reorder-dates') reorderDialog('dates');
-      else if (a === 'reorder-items') reorderDialog('items');
-      else if (a === 'undo-paste') undoPaste();
-      else if (a === 'add-item') itemDialog(null);
-      else if (a === 'add-student') studentDialog(null);
-      else if (a === 'paste-students') pasteDialog();
+      runAct(el.dataset.act);
     }
   });
 
