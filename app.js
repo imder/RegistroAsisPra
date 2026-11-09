@@ -36,7 +36,7 @@ function normalizeDB(d) {
   if (!d || !Array.isArray(d.courses) || !d.courses.length) return defaultDB();
   d.courses = d.courses.map(c => Object.assign(newCourse(), c));
   if (!d.courses.some(c => c.id === d.current)) d.current = d.courses[0].id;
-  d.advance = !!d.advance;
+  d.advance = false;   // al calificar, se queda en el estudiante (no baja al siguiente)
   d.showEntrevista = d.showEntrevista !== false;
   d.settings = d.settings && typeof d.settings === 'object' ? d.settings : null;
   d.tombstones = Array.isArray(d.tombstones) ? d.tombstones : [];
@@ -760,12 +760,12 @@ function gradeDialog(sid, iid) {
   render();
   openDlg(`<div class="gb-top"><span class="who">${c.students.indexOf(s) + 1} · ${esc(s.name)}</span><small>${esc(itemLabel(it))}</small>
       <label class="adv"><input type="checkbox" id="adv" ${db.advance ? 'checked' : ''}> Siguiente</label><button type="button" class="gb-x" id="cx" aria-label="Cerrar">✕</button></div>
-    <div class="gb-row"><select id="gsel" class="gsel" aria-label="Nota"><option value="">Nota… ▾</option>${QUICK.map(v => `<option value="${v}" ${v === String(cur) ? 'selected' : ''}>${v}</option>`).join('')}</select>
+    <div class="gb-row"><div class="quick gq">${QUICK.map(v => `<button type="button" data-v="${v}" class="${v === String(cur) ? 'sel' : ''}">${v}</button>`).join('')}</div>
     <button type="button" class="btn sec" id="clr" aria-label="Borrar nota">⌫</button></div>
     <div class="gb-hint">Para escribir otra nota: doble toque en la celda</div>`,
     f => {
       f.querySelector('#cx').onclick = closeDlg;
-      f.querySelector('#gsel').onchange = e => { if (e.target.value) commit(e.target.value); };
+      f.querySelectorAll('.quick button').forEach(b => b.onclick = () => commit(b.dataset.v));
       f.querySelector('#clr').onclick = () => commit('');
     }, null, true);
   scrollToActive();

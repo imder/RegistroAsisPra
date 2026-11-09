@@ -206,3 +206,7 @@ dialog.sheet #dlgForm{gap:6px;padding:8px max(12px,env(safe-area-inset-right)) c
 .actsel{font-size:16px;font-weight:700;padding:9px 12px;border:1px solid var(--green);border-radius:8px;background:var(--green);color:#fff;min-width:140px}
 .actsel option{background:#fff;color:#000;font-weight:400}
 .gsel{flex:1 1 160px;font-size:20px;font-weight:700;padding:8px 10px;border:1px solid var(--green);border-radius:8px;background:#fff;color:var(--green)}
+
+/* notas rápidas: botones pequeños */
+.gb-row .quick.gq{gap:4px;flex-wrap:wrap}
+.gb-row .quick.gq button{flex:0 0 auto;min-width:36px;width:auto;padding:5px 8px;font-size:13px;border-radius:6px}
