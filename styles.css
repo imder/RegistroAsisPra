@@ -218,3 +218,10 @@ dialog.sheet #dlgForm{gap:6px;padding:8px max(12px,env(safe-area-inset-right)) c
 .grid td.ent.flag,.grid tbody tr.active td.ent.flag{background:#e53935!important;color:#fff}
 .prac-view tbody tr.active td.ent:not(.flag){background:#fdecea}
 .ro-row.ro-ent{background:#fdecea;color:#b71c1c;font-weight:800}
+
+/* ENTREVISTA: colores suaves */
+.grid th.col.ent{background:#FF697B!important}
+.grid th.col.ent span{color:#fff!important}
+.grid td.ent,.grid tbody tr.active td.ent:not(.flag),.prac-view tbody tr.active td.ent:not(.flag){background:#fff}
+.grid td.ent.flag,.grid tbody tr.active td.ent.flag{background:#FFC7CE!important;color:#9C0006}
+.ro-row.ro-ent{background:#FFC7CE;color:#9C0006}

@@ -157,7 +157,7 @@ function setAtt(c, sid, did, v) {
 
 const ENTREVISTA_MIN = 2;   // actividades sin nota a partir de las cuales corresponde "Entrevista"
 function missingCount(c, sid) {
-  return c.items.filter(it => { const v = c.grades[sid] && c.grades[sid][it.id]; return v === undefined || v === ''; }).length;
+  return c.items.slice(0, entIdx(c)).filter(it => { const v = c.grades[sid] && c.grades[sid][it.id]; return v === undefined || v === ''; }).length;
 }
 const entMin = c => Math.max(1, parseInt(c.entMin, 10) || ENTREVISTA_MIN);
 const entIdx = c => c.entPos == null ? c.items.length : Math.max(0, Math.min(c.items.length, c.entPos));
@@ -648,7 +648,7 @@ function viewPracticas() {
   c.students.forEach((s, k) => {
     const ret = s.retirado;
     h += `<tr class="${ret ? 'retirado' : s.id === activeSid ? 'active' : ''}">${rowHead(c, s, k)}`;
-    const entTd = needsEntrevista(c, s) ? `<td class="ent flag" title="Le faltan ${missingCount(c, s.id)} actividades">Entrevista</td>` : `<td class="ent"></td>`;
+    const entTd = needsEntrevista(c, s) ? `<td class="ent flag" title="Le faltan ${missingCount(c, s.id)} actividades (antes de Entrevista)">Entrevista</td>` : `<td class="ent"></td>`;
     c.items.forEach((it, i) => {
       if (i === ei) h += entTd;
       const v = c.grades[s.id] && c.grades[s.id][it.id];
