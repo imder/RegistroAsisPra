@@ -16,17 +16,18 @@ async function hash(t) {
 function show(d) {
   const counted = d.acts.filter(a => a.c);
   const done = counted.filter(a => a.v !== ''), miss = counted.filter(a => a.v === '');
-  const other = d.acts.filter(a => !a.c);
-  const row = (a, cls, txt) => `<li class="${a.t === 'inv' ? 'inv' : 'prac'}"><span>${a.t === 'inv' ? '' : '<i class="ic">🖥️</i> '}${esc(a.n)}</span><span class="${cls}">${txt}</span></li>`;
+  const row = a => {
+    const falta = a.c && a.v === '';
+    const cls = falta ? 'miss' : a.t === 'inv' ? 'inv' : '';
+    const txt = falta ? 'Falta' : a.v !== '' ? esc(a.v) : 'Sin nota';
+    return `<li class="${cls}"><span>${a.t === 'inv' ? '' : '🖥️ '}${esc(a.n)}</span><span class="v ${a.v !== '' ? 'ok' : 'nc'}">${txt}</span></li>`;
+  };
   $('res').innerHTML = `<div class="card">
     <h2>${esc(d.name)}</h2>
     <div class="sub">${esc(d.curso)}${d.area ? ' · ' + esc(d.area) : ''}${d.prof ? ' · ' + esc(d.prof) : ''}</div>
     <div class="sum"><div class="s-ok"><b>${done.length}</b>Realizadas</div><div class="s-no"><b>${miss.length}</b>Faltantes</div></div>
     <div class="ent ${d.ent ? 'yes' : 'no'}">${d.ent ? `ENTREVISTA: te faltan ${miss.length} actividades (desde ${d.min} corresponde entrevista)` : 'No tienes entrevista pendiente'}</div>
-    ${miss.length ? `<h3>Faltantes</h3><ul>${miss.map(a => row(a, 'falta', 'Falta')).join('')}</ul>` : ''}
-    ${done.length ? `<h3>Realizadas</h3><ul>${done.map(a => row(a, 'ok', esc(a.v))).join('')}</ul>` : ''}
-    ${other.length ? `<h3>Otras actividades</h3><ul>${other.map(a => row(a, a.v ? 'ok' : 'nc', a.v ? esc(a.v) : 'Sin nota')).join('')}</ul>` : ''}
-    <div class="leg"><span><i class="ic">🖥️</i> Práctica</span><span class="g">Investigación</span></div>
+    <ul>${d.acts.map(row).join('')}</ul>
     <button type="button" id="upd" class="upd">⟳ Actualizar</button>
     <div class="foot" id="ts"></div>
     <div class="msg" id="msg2" role="alert"></div>
