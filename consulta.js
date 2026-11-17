@@ -17,7 +17,7 @@ function show(d) {
   const counted = d.acts.filter(a => a.c);
   const done = counted.filter(a => a.v !== ''), miss = counted.filter(a => a.v === '');
   const other = d.acts.filter(a => !a.c);
-  const row = (a, cls, txt) => `<li><span>${esc(a.n)}</span><span class="${cls}">${txt}</span></li>`;
+  const row = (a, cls, txt) => `<li class="${a.t === 'inv' ? 'inv' : 'prac'}"><span>${a.t === 'inv' ? '' : '<i class="ic">🖥️</i> '}${esc(a.n)}</span><span class="${cls}">${txt}</span></li>`;
   $('res').innerHTML = `<div class="card">
     <h2>${esc(d.name)}</h2>
     <div class="sub">${esc(d.curso)}${d.area ? ' · ' + esc(d.area) : ''}${d.prof ? ' · ' + esc(d.prof) : ''}</div>
@@ -26,23 +26,31 @@ function show(d) {
     ${miss.length ? `<h3>Faltantes</h3><ul>${miss.map(a => row(a, 'falta', 'Falta')).join('')}</ul>` : ''}
     ${done.length ? `<h3>Realizadas</h3><ul>${done.map(a => row(a, 'ok', esc(a.v))).join('')}</ul>` : ''}
     ${other.length ? `<h3>Otras actividades</h3><ul>${other.map(a => row(a, a.v ? 'ok' : 'nc', a.v ? esc(a.v) : 'Sin nota')).join('')}</ul>` : ''}
+    <div class="leg"><span><i class="ic">🖥️</i> Práctica</span><span class="g">Investigación</span></div>
+    <button type="button" id="upd" class="upd">⟳ Actualizar</button>
+    <div class="foot" id="ts"></div>
+    <div class="msg" id="msg2" role="alert"></div>
   </div>`;
   $('res').hidden = false;
+  $('upd').onclick = () => lookup(lastCode, true);
+  $('ts').textContent = 'Consultado a las ' + new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
 }
 
-$('f').addEventListener('submit', async e => {
-  e.preventDefault();
-  const code = $('code').value.trim(), msg = $('msg'), btn = $('go');
-  msg.textContent = ''; $('res').hidden = true;
+let lastCode = '';
+async function lookup(code, refresh) {
+  const msg = $(refresh ? 'msg2' : 'msg'), btn = refresh ? $('upd') : $('go'), label = btn.textContent;
+  msg.textContent = '';
+  if (!refresh) $('res').hidden = true;
   if (!code) { msg.textContent = 'Escribe tu código RUDE o C.I.'; return; }
   if (!fs) { msg.textContent = 'La consulta aún no está configurada.'; return; }
-  btn.disabled = true; btn.textContent = 'Buscando…';
+  btn.disabled = true; btn.textContent = refresh ? 'Actualizando…' : 'Buscando…';
   try {
     const snap = await getDoc(doc(fs, 'consulta', await hash(code)));
-    if (!snap.exists()) msg.textContent = 'No se encontró ese código. Revisa que esté bien escrito.';
-    else show(JSON.parse(snap.data().data));
+    if (!snap.exists()) { if (refresh) $('res').hidden = true; $('msg').textContent = 'No se encontró ese código. Revisa que esté bien escrito.'; }
+    else { lastCode = code; $('go').disabled = false; $('go').textContent = 'Consultar'; show(JSON.parse(snap.data().data)); return; }
   } catch (err) {
     msg.textContent = 'No se pudo consultar. Revisa tu conexión e inténtalo de nuevo.';
   }
-  btn.disabled = false; btn.textContent = 'Consultar';
-});
+  btn.disabled = false; btn.textContent = label;
+}
+$('f').addEventListener('submit', e => { e.preventDefault(); lookup($('code').value.trim(), false); });
