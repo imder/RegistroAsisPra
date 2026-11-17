@@ -18,7 +18,7 @@ function show(d) {
   const done = counted.filter(a => a.v !== ''), miss = counted.filter(a => a.v === '');
   const row = a => {
     const falta = a.c && a.v === '';
-    const cls = falta ? 'miss' : a.t === 'inv' ? 'inv' : '';
+    const cls = falta ? 'miss' : '';
     const txt = falta ? 'Falta' : a.v !== '' ? esc(a.v) : 'Sin nota';
     return `<li class="${cls}"><span>${a.t === 'inv' ? '' : '🖥️ '}${esc(a.n)}</span><span class="v ${a.v !== '' ? 'ok' : 'nc'}">${txt}</span></li>`;
   };
@@ -26,7 +26,7 @@ function show(d) {
     <h2>${esc(d.name)}</h2>
     <div class="sub">${esc(d.curso)}${d.area ? ' · ' + esc(d.area) : ''}${d.prof ? ' · ' + esc(d.prof) : ''}</div>
     <div class="sum"><div class="s-ok"><b>${done.length}</b>Realizadas</div><div class="s-no"><b>${miss.length}</b>Faltantes</div></div>
-    <div class="ent ${d.ent ? 'yes' : 'no'}">${d.ent ? `ENTREVISTA: te faltan ${miss.length} actividades (desde ${d.min} corresponde entrevista)` : 'No tienes entrevista pendiente'}</div>
+    <div class="ent ${d.ent ? 'yes' : 'no'}">${d.ent ? `Corresponde entrevista${d.tri ? ' del ' + esc(d.tri.replace(/TRIMESTRE/i, 'Trimestre')) : ''}` : 'No tienes entrevista pendiente'}</div>
     <ul>${d.acts.map(row).join('')}</ul>
     <button type="button" id="upd" class="upd">⟳ Actualizar</button>
     <div class="foot" id="ts"></div>

@@ -1049,7 +1049,7 @@ function buildPublic(c, s, showEnt) {
     return { n: it.name, t: it.tipo, v: v === undefined ? '' : String(v), c: i < ei };
   });
   const missing = acts.filter(a => a.c && a.v === '').length;
-  return { name: s.name, curso: courseShort(c), area: c.area || '', prof: c.prof || '', anio: c.anio || '', acts, missing, min: entMin(c), ent: !!showEnt && missing >= entMin(c) };
+  return { name: s.name, curso: courseShort(c), tri: c.trimestre || '', area: c.area || '', prof: c.prof || '', anio: c.anio || '', acts, missing, min: entMin(c), ent: !!showEnt && missing >= entMin(c) };
 }
 async function publishConsulta() {
   if (!Sync.tr || !Sync.user) { toast('Primero inicia sesión con Google (☁)'); return; }
