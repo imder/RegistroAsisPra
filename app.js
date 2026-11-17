@@ -664,10 +664,10 @@ function viewPracticas() {
 function viewEstudiantes() {
   const c = C();
   let h = `<div class="toolbar"><button class="btn" data-act="add-student">+ Estudiante</button>
-    <button class="btn sec" data-act="paste-students">Pegar lista</button></div><div class="list">`;
+    <button class="btn sec" data-act="paste-students">Pegar lista</button><button class="btn sec" data-act="paste-codes">Pegar códigos RUDE / C.I.</button></div><div class="list">`;
   if (!c.students.length) h += `<div class="empty">Agrega estudiantes uno por uno, o usa <b>Pegar lista</b> para copiar la columna de nombres desde Excel o Word.</div>`;
   c.students.forEach((s, k) => {
-    h += `<div class="stu ${s.retirado ? 'ret' : s.id === activeSid ? 'active' : ''}" ${s.retirado ? '' : `data-sid="${s.id}"`}><span class="n">${k + 1}</span><span class="nm">${esc(s.name)}${s.retirado ? ' <b>(R)</b>' : ''}</span><button data-edit="${s.id}">Editar</button></div>`;
+    h += `<div class="stu ${s.retirado ? 'ret' : s.id === activeSid ? 'active' : ''}" ${s.retirado ? '' : `data-sid="${s.id}"`}><span class="n">${k + 1}</span><span class="nm">${esc(s.name)}${s.retirado ? ' <b>(R)</b>' : ''}${s.rude || s.ci ? '' : ' <small class="nocode">sin código</small>'}</span><button data-edit="${s.id}">Editar</button></div>`;
   });
   return h + `</div>`;
 }
@@ -976,6 +976,8 @@ function studentDialog(sid) {
   const c = C(), s = sid ? c.students.find(x => x.id === sid) : null;
   openDlg(`<h3>${s ? 'Editar estudiante' : 'Nuevo estudiante'}</h3>
     <label>Apellidos y nombres<input id="sn" value="${esc(s ? s.name : '')}" maxlength="80" autocomplete="off"></label>
+    <label>Código RUDE<input id="srude" value="${esc(s ? s.rude || '' : '')}" maxlength="30" inputmode="numeric" autocomplete="off"></label>
+    <label>Carnet de identidad (C.I.)<input id="sci" value="${esc(s ? s.ci || '' : '')}" maxlength="20" autocomplete="off"></label>
     ${s ? `<label style="flex-direction:row;align-items:center;gap:8px;font-size:14px;color:#333"><input type="checkbox" id="sr" style="width:auto" ${s.retirado ? 'checked' : ''}> Retirado</label>` : ''}
     <div class="actions">${s ? '<button type="button" class="btn danger" id="del">Eliminar</button>' : ''}<button type="button" class="btn sec" id="cx">Cancelar</button><button class="btn" id="ok">Guardar</button></div>`,
     f => {
@@ -992,10 +994,81 @@ function studentDialog(sid) {
     }, doSave);
   function doSave() {
     const name = $('#sn').value.trim(); if (!name) return;
-    if (s) { s.name = name; s.retirado = $('#sr').checked; }
-    else c.students.push({ id: uid(), name, retirado: false });
+    const rude = $('#srude').value.trim(), ci = $('#sci').value.trim();
+    if (s) { s.name = name; s.retirado = $('#sr').checked; s.rude = rude; s.ci = ci; }
+    else c.students.push({ id: uid(), name, retirado: false, rude, ci });
     save(); closeDlg(); render();
   }
+}
+
+/* ---------- códigos RUDE / C.I. ---------- */
+function planCodes(c, text) {
+  const byName = {}; c.students.forEach(s => { byName[normName(s.name).split(' ').sort().join(' ')] = s; });
+  const out = { ok: [], miss: [] };
+  text.split(/\r?\n/).forEach(l => {
+    const parts = l.split('\t').map(p => p.trim()).filter(Boolean); if (!parts.length) return;
+    const nm = parts.find(p => /[A-Za-zÁÉÍÓÚÑáéíóúñ]{2}/.test(p));
+    const codes = parts.filter(p => p !== nm && /\d/.test(p) && !/^\d{1,3}$/.test(p));
+    if (!nm || !codes.length) return;
+    const s = byName[normName(nm.replace(/^\d+[\.\)\-]?\s+/, '')).split(' ').sort().join(' ')];
+    if (!s) { out.miss.push(nm); return; }
+    const upd = {};
+    codes.forEach(p => { const d = p.replace(/\D/g, ''); if (d.length >= 12) upd.rude = p.replace(/\s+/g, ''); else upd.ci = p.replace(/\s+/g, ' ').trim(); });
+    out.ok.push([s, upd]);
+  });
+  return out;
+}
+function pasteCodesDialog() {
+  openDlg(`<h3>Pegar códigos RUDE / C.I.</h3>
+    <div class="stat">Pega desde Excel las columnas: <b>nombre</b>, <b>RUDE</b> y/o <b>C.I.</b> (una por estudiante, en cualquier orden). Se reconoce al estudiante por su nombre; un número de 12 o más dígitos se toma como RUDE y uno más corto como C.I.</div>
+    <textarea id="pl" placeholder="APOMA CARMEN NAYELI&#9;81980001201501234&#9;9876543"></textarea>
+    <div class="actions"><button type="button" class="btn sec" id="cx">Cancelar</button><button type="button" class="btn" id="ok">Asignar</button></div>`,
+    f => {
+      f.querySelector('#cx').onclick = closeDlg;
+      f.querySelector('#ok').onclick = () => {
+        const p = planCodes(C(), $('#pl').value);
+        p.ok.forEach(([s, u]) => Object.assign(s, u));
+        if (p.ok.length) save();
+        closeDlg(); render();
+        toast(`${p.ok.length} asignados` + (p.miss.length ? ` · sin coincidir: ${p.miss.slice(0, 3).join(', ')}${p.miss.length > 3 ? '…' : ''}` : ''));
+      };
+      setTimeout(() => f.querySelector('#pl').focus(), 50);
+    });
+}
+
+/* ---------- consulta para estudiantes (publica un resumen por código) ---------- */
+const normCode = t => String(t || '').toUpperCase().replace(/\s+/g, '');
+async function codeHash(t) {
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normCode(t)));
+  return Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2, '0')).join('');
+}
+function buildPublic(c, s, showEnt) {
+  const ei = entIdx(c);
+  const acts = c.items.map((it, i) => {
+    const v = c.grades[s.id] && c.grades[s.id][it.id];
+    return { n: it.name, t: it.tipo, v: v === undefined ? '' : String(v), c: i < ei };
+  });
+  const missing = acts.filter(a => a.c && a.v === '').length;
+  return { name: s.name, curso: courseShort(c), area: c.area || '', prof: c.prof || '', anio: c.anio || '', acts, missing, min: entMin(c), ent: !!showEnt && missing >= entMin(c) };
+}
+async function publishConsulta() {
+  if (!Sync.tr || !Sync.user) { toast('Primero inicia sesión con Google (☁)'); return; }
+  const docs = {};
+  let sinCodigo = 0;
+  for (const c of sortedCourses(db.courses)) for (const s of c.students) {
+    if (s.retirado) continue;
+    const codes = [s.rude, s.ci].filter(x => x && String(x).trim());
+    if (!codes.length) { sinCodigo++; continue; }
+    const data = JSON.stringify(buildPublic(c, s, db.showEntrevista));
+    for (const code of codes) docs[await codeHash(code)] = data;
+  }
+  const stale = (db.pubIds || []).filter(id => !(id in docs));
+  toast('Publicando…');
+  try {
+    await Sync.tr.publish(Sync.user.uid, docs, stale);
+    db.pubIds = Object.keys(docs); persist();
+    toast(`Publicado: ${Object.keys(docs).length} códigos` + (sinCodigo ? ` · ${sinCodigo} estudiantes sin código` : ''));
+  } catch (e) { toast('No se pudo publicar: ' + (e && e.message || e)); }
 }
 
 function pasteDialog() {
@@ -1165,6 +1238,7 @@ function onMenu(act) {
   else if (act === 'curso-nuevo') courseDialog(true);
   else if (act === 'export-xlsx') doExportXlsx();
   else if (act === 'export-json') doExportJson();
+  else if (act === 'publish-consulta') publishConsulta();
   else if (act === 'import-json') $('#fileJson').click();
   else if (act === 'import-xlsx') $('#fileXlsx').click();
   else if (act === 'curso-borrar') {
@@ -1193,6 +1267,7 @@ function runAct(a) {
   else if (a === 'add-item') itemDialog(null);
   else if (a === 'add-student') studentDialog(null);
   else if (a === 'paste-students') pasteDialog();
+  else if (a === 'paste-codes') pasteCodesDialog();
 }
 function init() {
   db = load();
@@ -1258,4 +1333,4 @@ function init() {
 }
 
 if (typeof document !== 'undefined' && document.getElementById) init();
-if (typeof module !== 'undefined') module.exports = { missingCount, needsEntrevista, sortedCourses, courseCmp, splitName, sheetName, itemLabel, parsePaste, planPaste, detectNameCol, looksLikeHeader, attMark, normName, courseShort, buildXlsx, newCourse, attStats, average, dateLabel, normalizeDB, mergeRemote, pendingWrites, isPristine };
+if (typeof module !== 'undefined') module.exports = { buildPublic, planCodes, missingCount, needsEntrevista, sortedCourses, courseCmp, splitName, sheetName, itemLabel, parsePaste, planPaste, detectNameCol, looksLikeHeader, attMark, normName, courseShort, buildXlsx, newCourse, attStats, average, dateLabel, normalizeDB, mergeRemote, pendingWrites, isPristine };

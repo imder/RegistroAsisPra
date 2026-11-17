@@ -1,5 +1,5 @@
-const CACHE = 'registro-escolar-v19';
-const ASSETS = ['./', './index.html', './styles.css', './app.js', './importer.js', './sync.js', './firebase-config.js', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
+const CACHE = 'registro-escolar-v20';
+const ASSETS = ['./', './index.html', './consulta.html', './consulta.js', './styles.css', './app.js', './importer.js', './sync.js', './firebase-config.js', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));

@@ -38,3 +38,6 @@ Los datos viven en el navegador de cada dispositivo. Si borras los datos del nav
 
 ## Columna ENTREVISTA (pestaña Prácticas)
 Muestra "Entrevista" cuando al estudiante le faltan 2 o más actividades (celdas sin nota). Se oculta/muestra con el botón "Ocultar/Mostrar Entrevista" y también se incluye en el Excel exportado cuando está visible.
+
+## Consulta para estudiantes
+`consulta.html`: el estudiante ingresa su RUDE o C.I. y ve actividades realizadas, faltantes y si tiene entrevista. Requiere Firebase y las reglas de SINCRONIZACION.md (sección "Página de consulta"). Registra los códigos en Estudiantes y publica con ⋮ → Publicar consulta de estudiantes.

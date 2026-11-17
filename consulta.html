@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#4e7d2e">
+<title>Consulta de actividades</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f4f6f2;color:#1c2b12}
+header{background:#4e7d2e;color:#fff;padding:16px;text-align:center}
+header h1{margin:0;font-size:20px}
+header p{margin:4px 0 0;font-size:13px;opacity:.9}
+main{max-width:560px;margin:0 auto;padding:16px}
+.card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.12);margin-bottom:14px}
+label{display:block;font-weight:700;font-size:14px;margin-bottom:6px}
+input{width:100%;font-size:18px;padding:12px;border:1px solid #9bb88a;border-radius:8px}
+button{margin-top:12px;width:100%;font-size:17px;font-weight:700;padding:13px;border:0;border-radius:8px;background:#4e7d2e;color:#fff;cursor:pointer}
+button:disabled{opacity:.6}
+.msg{color:#9c0006;font-size:14px;margin-top:10px;min-height:1em}
+h2{margin:0 0 2px;font-size:18px}
+.sub{color:#555;font-size:13px}
+.sum{display:flex;gap:8px;margin:14px 0}
+.sum div{flex:1;text-align:center;border-radius:10px;padding:10px 4px;font-size:12px}
+.sum b{display:block;font-size:26px}
+.s-ok{background:#d8f5e6;color:#0d5c32}.s-no{background:#fdecea;color:#9c0006}
+.ent{border-radius:10px;padding:12px;text-align:center;font-weight:800;font-size:16px;margin-bottom:12px}
+.ent.yes{background:#FFC7CE;color:#9C0006}.ent.no{background:#d8f5e6;color:#0d5c32}
+ul{list-style:none;margin:0;padding:0}
+li{display:flex;justify-content:space-between;gap:8px;padding:9px 4px;border-bottom:1px solid #eee;font-size:15px}
+li:last-child{border-bottom:0}
+.ok{color:#0d5c32;font-weight:700}.falta{color:#9c0006;font-weight:700}.nc{color:#888}
+h3{margin:14px 0 4px;font-size:14px;color:#4e7d2e;text-transform:uppercase;letter-spacing:.04em}
+.foot{font-size:12px;color:#777;text-align:center;margin-top:8px}
+[hidden]{display:none}
+</style>
+</head>
+<body>
+<header><h1>Consulta de actividades</h1><p>Ingresa tu código RUDE o tu número de carnet de identidad</p></header>
+<main>
+  <form class="card" id="f">
+    <label for="code">Código RUDE o C.I.</label>
+    <input id="code" autocomplete="off" autocapitalize="characters" inputmode="text" placeholder="Ej. 1234567">
+    <button id="go" type="submit">Consultar</button>
+    <div class="msg" id="msg" role="alert"></div>
+  </form>
+  <div id="res" hidden></div>
+  <div class="foot">Si tus datos no son correctos o no te encuentras, consulta con tu profesor(a).</div>
+</main>
+<script src="firebase-config.js"></script>
+<script type="module" src="consulta.js"></script>
+</body>
+</html>

@@ -5,7 +5,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {
   initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager,
-  collection, doc, setDoc, onSnapshot
+  collection, doc, setDoc, deleteDoc, onSnapshot
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 export function createTransport(config) {
@@ -47,6 +47,12 @@ export function createTransport(config) {
       }, onError);
     },
     unlisten() { if (unsub) unsub(); unsub = null; },
+    // resumen público por código (consulta.html lo lee con get; solo el dueño escribe)
+    async publish(uid, docs, removeIds) {
+      const now = Date.now();
+      await Promise.all(Object.entries(docs).map(([id, data]) => setDoc(doc(fs, 'consulta', id), { owner: uid, updatedAt: now, data })));
+      await Promise.all((removeIds || []).map(id => deleteDoc(doc(fs, 'consulta', id)).catch(() => {})));
+    },
     write(uid, id, payload) { return setDoc(doc(fs, 'users', uid, 'courses', id), payload); }
   };
 }

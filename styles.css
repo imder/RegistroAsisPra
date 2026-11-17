@@ -225,3 +225,5 @@ dialog.sheet #dlgForm{gap:6px;padding:8px max(12px,env(safe-area-inset-right)) c
 .grid td.ent,.grid tbody tr.active td.ent:not(.flag),.prac-view tbody tr.active td.ent:not(.flag){background:#fff}
 .grid td.ent.flag,.grid tbody tr.active td.ent.flag{background:#FFC7CE!important;color:#9C0006}
 .ro-row.ro-ent{background:#FFC7CE;color:#9C0006}
+
+.nocode{color:#b26a00;font-size:11px;margin-left:4px}

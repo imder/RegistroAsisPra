@@ -45,3 +45,30 @@ service cloud.firestore {
 - Eliminar un curso lo elimina en todos tus dispositivos.
 - Sigue disponible **⋮ → Copia de seguridad (.json)** como respaldo adicional.
 - Si no inicias sesión, la app sigue funcionando solo con datos locales.
+
+## Página de consulta para estudiantes (consulta.html)
+Los estudiantes escriben su **RUDE o C.I.** en `https://TUUSUARIO.github.io/TU-REPO/consulta.html` y ven sus actividades realizadas, faltantes y si tienen entrevista.
+
+1. **Reglas de Firestore** (Firestore → Reglas): reemplaza por estas (agrega la parte `consulta`) y **Publicar**:
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /consulta/{id} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if request.auth != null && request.resource.data.owner == request.auth.uid;
+      allow update: if request.auth != null && resource.data.owner == request.auth.uid && request.resource.data.owner == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.owner == request.auth.uid;
+    }
+  }
+}
+```
+2. En la app, registra el **RUDE y/o C.I.** de cada estudiante (Estudiantes → Editar, o **Pegar códigos RUDE / C.I.** desde Excel).
+3. Inicia sesión con Google (☁) y usa **⋮ → Publicar consulta de estudiantes**. Repite cada vez que quieras actualizar lo que ven los estudiantes (no es automático).
+
+Privacidad: en la nube solo se guarda, por cada código, el nombre, curso, y las notas de ese estudiante. Nadie puede listar los códigos; solo quien conozca el código exacto puede ver ese resumen.
