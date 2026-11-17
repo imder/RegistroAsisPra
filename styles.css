@@ -210,3 +210,11 @@ dialog.sheet #dlgForm{gap:6px;padding:8px max(12px,env(safe-area-inset-right)) c
 /* notas rápidas: botones pequeños */
 .gb-row .quick.gq{gap:4px;flex-wrap:wrap}
 .gb-row .quick.gq button{flex:0 0 auto;min-width:36px;width:auto;padding:5px 8px;font-size:13px;border-radius:6px}
+
+/* ENTREVISTA en rojo */
+.grid th.col.ent{background:#c62828!important}
+.grid th.col.ent span{color:#fff!important}
+.grid td.ent{background:#fdecea}
+.grid td.ent.flag,.grid tbody tr.active td.ent.flag{background:#e53935!important;color:#fff}
+.prac-view tbody tr.active td.ent:not(.flag){background:#fdecea}
+.ro-row.ro-ent{background:#fdecea;color:#b71c1c;font-weight:800}

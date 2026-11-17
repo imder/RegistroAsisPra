@@ -25,7 +25,7 @@ function newCourse(extra) {
   return Object.assign({
     id: uid(), unidad: '', prof: '', area: '', grado: '', paralelo: '', nivel: '',
     trimestre: TRIMESTRES[0], anio: new Date().getFullYear(),
-    students: [], dates: [], items: [], att: {}, grades: {}
+    students: [], dates: [], items: [], att: {}, grades: {}, entMin: 2, entPos: null
   }, extra || {});
 }
 function defaultDB() {
@@ -159,7 +159,9 @@ const ENTREVISTA_MIN = 2;   // actividades sin nota a partir de las cuales corre
 function missingCount(c, sid) {
   return c.items.filter(it => { const v = c.grades[sid] && c.grades[sid][it.id]; return v === undefined || v === ''; }).length;
 }
-const needsEntrevista = (c, s) => !s.retirado && missingCount(c, s.id) >= ENTREVISTA_MIN;
+const entMin = c => Math.max(1, parseInt(c.entMin, 10) || ENTREVISTA_MIN);
+const entIdx = c => c.entPos == null ? c.items.length : Math.max(0, Math.min(c.items.length, c.entPos));
+const needsEntrevista = (c, s) => !s.retirado && missingCount(c, s.id) >= entMin(c);
 
 function isNumeric(v) { return v !== '' && v != null && !isNaN(Number(v)); }
 
@@ -634,22 +636,26 @@ function viewAsistencia() {
 
 function viewPracticas() {
   const c = C();
-  let h = `<div class="toolbar">${actMenu([['add-item', '+ Actividad'], ['paste-prac', 'Pegar de Excel'], ['reorder-items', 'Ordenar'], ['toggle-ent', db.showEntrevista ? 'Ocultar Entrevista' : 'Mostrar Entrevista'], undoOpt('prac')])}
+  let h = `<div class="toolbar">${actMenu([['add-item', '+ Actividad'], ['paste-prac', 'Pegar de Excel'], ['reorder-items', 'Ordenar'], ['toggle-ent', db.showEntrevista ? 'Ocultar Entrevista' : 'Mostrar Entrevista'], ['ent-min', `Entrevista desde ${entMin(c)} faltantes…`], undoOpt('prac')])}
     <span class="grow stat hint">${c.items.length} actividades${db.showEntrevista ? ` · ${c.students.filter(s => needsEntrevista(c, s)).length} en entrevista` : ''}</span></div>`;
   if (!c.students.length) return h + noStudents();
   h += `<div class="grid-wrap"><table class="grid prac-view"><thead><tr><th class="c-n corner">N°</th><th class="c-name corner">APELLIDOS Y NOMBRES</th>`;
-  c.items.forEach(it => { h += `<th class="col ${colAct(it.id)} ${it.tipo === 'inv' ? 'inv' : 'prac'}" data-hi="${it.id}"><span>${it.tipo === 'inv' ? '' : '<i class="ic">🖥️</i> '}${esc(it.name)}</span></th>`; });
-  if (db.showEntrevista) h += `<th class="col ent"><span>ENTREVISTA</span></th>`;
+  const ei = db.showEntrevista ? entIdx(c) : -1;
+  const entTh = `<th class="col ent"><span>ENTREVISTA</span></th>`;
+  c.items.forEach((it, i) => { if (i === ei) h += entTh; h += `<th class="col ${colAct(it.id)} ${it.tipo === 'inv' ? 'inv' : 'prac'}" data-hi="${it.id}"><span>${it.tipo === 'inv' ? '' : '<i class="ic">🖥️</i> '}${esc(it.name)}</span></th>`; });
+  if (ei === c.items.length) h += entTh;
   h += `</tr></thead><tbody>`;
   c.students.forEach((s, k) => {
     const ret = s.retirado;
     h += `<tr class="${ret ? 'retirado' : s.id === activeSid ? 'active' : ''}">${rowHead(c, s, k)}`;
-    c.items.forEach(it => {
+    const entTd = needsEntrevista(c, s) ? `<td class="ent flag" title="Le faltan ${missingCount(c, s.id)} actividades">Entrevista</td>` : `<td class="ent"></td>`;
+    c.items.forEach((it, i) => {
+      if (i === ei) h += entTd;
       const v = c.grades[s.id] && c.grades[s.id][it.id];
       const has = !ret && v !== undefined && v !== '';
       h += `<td class="cell ${has ? 'on' : 'pend'} ${colAct(it.id)}" ${ret ? '' : `data-g="${s.id}|${it.id}"`}>${has ? esc(v) : ''}</td>`;
     });
-    if (db.showEntrevista) h += needsEntrevista(c, s) ? `<td class="ent flag" title="Le faltan ${missingCount(c, s.id)} actividades">Entrevista</td>` : `<td class="ent"></td>`;
+    if (ei === c.items.length) h += entTd;
     h += `</tr>`;
   });
   return h + `</tbody></table></div>`;
@@ -842,9 +848,26 @@ function attChooser(sid, did) {
 }
 
 /* ---------- ordenar columnas ---------- */
+function entMinDialog() {
+  const c = C();
+  openDlg(`<h3>Columna Entrevista</h3>
+    <label>Mostrar "Entrevista" cuando falten esta cantidad de actividades (o más)<input type="number" id="em" min="1" max="99" value="${entMin(c)}" inputmode="numeric"></label>
+    <div class="actions"><button type="button" class="btn sec" id="cx">Cancelar</button><button class="btn" id="ok">Guardar</button></div>`,
+    f => { f.querySelector('#cx').onclick = closeDlg; f.querySelector('#ok').onclick = doSave; }, doSave);
+  function doSave() {
+    const n = parseInt($('#em').value, 10);
+    if (!(n >= 1)) { toast('Escribe un número mayor a 0'); return; }
+    c.entMin = n; save(); closeDlg(); render();
+  }
+}
 function reorderDialog(kind) {
-  const c = C(), arr = kind === 'dates' ? c.dates : c.items;
-  const label = x => kind === 'dates' ? dateLabel(x.date) : itemLabel(x);
+  const c = C();
+  const withEnt = kind === 'items' && db.showEntrevista;
+  const ENT = { id: '__ent', ent: true };
+  let arr = kind === 'dates' ? c.dates : c.items.slice();
+  if (withEnt) arr.splice(entIdx(c), 0, ENT);
+  const label = x => x.ent ? 'ENTREVISTA' : kind === 'dates' ? dateLabel(x.date) : itemLabel(x);
+  const sync = () => { if (kind !== 'items') return; const k = arr.indexOf(ENT); c.items = arr.filter(x => x !== ENT); if (k >= 0) c.entPos = k >= c.items.length ? null : k; };
   let hl = -1;
   openDlg(`<h3>${kind === 'dates' ? 'Ordenar fechas' : 'Ordenar actividades'}</h3>
     <div class="stat">Mueve cada columna con las flechas: ⤒ al inicio · ▲ una antes · ▼ una después · ⤓ al final.</div>
@@ -860,13 +883,13 @@ function reorderDialog(kind) {
         const j = { top: 0, up: i - 1, down: i + 1, bot: arr.length - 1 }[b.dataset.m];
         if (j < 0 || j >= arr.length || j === i) return;
         const [x] = arr.splice(i, 1); arr.splice(j, 0, x);
-        hl = j; save(); render(); draw();
+        hl = j; sync(); save(); render(); draw();
       };
       draw();
     });
   function draw() {
     const box = $('#rol'), top = box.scrollTop;
-    box.innerHTML = arr.map((x, i) => `<div class="ro-row ${i === hl ? 'hl' : ''}" data-i="${i}"><span class="ro-n">${i + 1}</span><span class="ro-t">${esc(label(x))}</span>
+    box.innerHTML = arr.map((x, i) => `<div class="ro-row ${i === hl ? 'hl' : ''} ${x.ent ? 'ro-ent' : ''}" data-i="${i}"><span class="ro-n">${i + 1}</span><span class="ro-t">${esc(label(x))}</span>
       <button type="button" data-m="top" ${i === 0 ? 'disabled' : ''}>⤒</button><button type="button" data-m="up" ${i === 0 ? 'disabled' : ''}>▲</button>
       <button type="button" data-m="down" ${i === arr.length - 1 ? 'disabled' : ''}>▼</button><button type="button" data-m="bot" ${i === arr.length - 1 ? 'disabled' : ''}>⤓</button></div>`).join('') || '<div class="stat">No hay columnas.</div>';
     box.scrollTop = top;
@@ -1166,6 +1189,7 @@ function runAct(a) {
   else if (a === 'reorder-dates') reorderDialog('dates');
   else if (a === 'reorder-items') reorderDialog('items');
   else if (a === 'undo-paste') undoPaste();
+  else if (a === 'ent-min') entMinDialog();
   else if (a === 'add-item') itemDialog(null);
   else if (a === 'add-student') studentDialog(null);
   else if (a === 'paste-students') pasteDialog();
