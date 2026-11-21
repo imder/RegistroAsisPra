@@ -48,10 +48,12 @@ export function createTransport(config) {
     },
     unlisten() { if (unsub) unsub(); unsub = null; },
     // resumen público por código (consulta.html lo lee con get; solo el dueño escribe)
-    async publish(uid, docs, removeIds) {
+    async publish(uid, docs, removeIds, imgs, removeImgs) {
       const now = Date.now();
       await Promise.all(Object.entries(docs).map(([id, data]) => setDoc(doc(fs, 'consulta', id), { owner: uid, updatedAt: now, data })));
+      await Promise.all(Object.entries(imgs || {}).map(([id, data]) => setDoc(doc(fs, 'consultaimg', id), { owner: uid, updatedAt: now, data })));
       await Promise.all((removeIds || []).map(id => deleteDoc(doc(fs, 'consulta', id)).catch(() => {})));
+      await Promise.all((removeImgs || []).map(id => deleteDoc(doc(fs, 'consultaimg', id)).catch(() => {})));
     },
     write(uid, id, payload) { return setDoc(doc(fs, 'users', uid, 'courses', id), payload); }
   };

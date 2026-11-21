@@ -557,11 +557,22 @@ function openDlg(html, bind, onEnter, sheet) {
   if (!dlg.open) { if (sheet) dlg.show(); else dlg.showModal(); }
   if (sheet) reserveSheet();
 }
+const isSec = c => String(c.nivel || '').toLowerCase() === 'secundaria';
+function courseSelectDialog() {
+  const list = sortedCourses(db.courses);
+  openDlg(`<h3>Elegir curso</h3>
+    <div class="course-grid">${list.map(c => `<button type="button" class="course-btn ${isSec(c) ? 'sec' : 'prim'} ${c.id === db.current ? 'cur' : ''}" data-cid="${c.id}"><b>${esc(sheetName(c))}</b>${c.trimestre ? `<small>${esc(triShort(c.trimestre))}</small>` : ''}</button>`).join('')}</div>
+    <div class="actions"><button type="button" class="btn sec" id="cx">Cerrar</button></div>`,
+    f => {
+      f.querySelector('#cx').onclick = closeDlg;
+      f.querySelectorAll('[data-cid]').forEach(b => b.onclick = () => { db.current = b.dataset.cid; save(null); closeDlg(); activeSid = null; anchor = null; render(); });
+    });
+}
 function closeDlg() { const d = $('#dlg'); if (d.open) d.close(); }
 
 function renderHeader() {
-  const sel = $('#courseSel');
-  sel.innerHTML = sortedCourses(db.courses).map(c => `<option value="${c.id}" ${c.id === db.current ? 'selected' : ''}>${esc(courseShort(c))}</option>`).join('');
+  const cur = db.courses.find(c => c.id === db.current);
+  $('#courseSel').textContent = (cur ? courseShort(cur) : 'Curso') + ' ▾';
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
 }
 
@@ -1146,31 +1157,37 @@ async function codeHash(t) {
   const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normCode(t)));
   return Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2, '0')).join('');
 }
-function buildPublic(c, s, showEnt) {
+function buildPublic(c, s, showEnt, imgIds) {
   const ei = entIdx(c);
   const acts = c.items.map((it, i) => {
     const v = c.grades[s.id] && c.grades[s.id][it.id];
-    return { n: it.name, t: it.tipo, v: v === undefined ? '' : String(v), c: i < ei };
+    return { n: it.name, t: it.tipo, v: v === undefined ? '' : String(v), c: i < ei, im: (imgIds && imgIds[it.id]) || '' };
   });
   const missing = acts.filter(a => a.c && a.v === '').length;
   return { name: s.name, curso: courseShort(c), tri: c.trimestre || '', area: c.area || '', prof: c.prof || '', anio: c.anio || '', acts, missing, min: entMin(c), ent: !!showEnt && missing >= entMin(c) };
 }
 async function publishConsulta() {
   if (!Sync.tr || !Sync.user) { toast('Primero inicia sesión con Google (☁)'); return; }
-  const docs = {};
+  const docs = {}, imgs = {}, byCourse = {};
   let sinCodigo = 0;
+  for (const c of sortedCourses(db.courses)) {
+    const imgIds = {};
+    for (const it of c.items) if (it.img) { const id = await codeHash(`${Sync.user.uid}|${c.id}|${it.id}`); imgIds[it.id] = id; imgs[id] = it.img; }
+    byCourse[c.id] = imgIds;
+  }
   for (const c of sortedCourses(db.courses)) for (const s of c.students) {
     if (s.retirado) continue;
     const codes = [s.rude, s.ci].filter(x => x && String(x).trim());
     if (!codes.length) { sinCodigo++; continue; }
-    const data = JSON.stringify(buildPublic(c, s, db.showEntrevista));
+    const data = JSON.stringify(buildPublic(c, s, db.showEntrevista, byCourse[c.id]));
     for (const code of codes) docs[await codeHash(code)] = data;
   }
   const stale = (db.pubIds || []).filter(id => !(id in docs));
+  const staleImgs = (db.pubImgIds || []).filter(id => !(id in imgs));
   toast('Publicando…');
   try {
-    await Sync.tr.publish(Sync.user.uid, docs, stale);
-    db.pubIds = Object.keys(docs); persist();
+    await Sync.tr.publish(Sync.user.uid, docs, stale, imgs, staleImgs);
+    db.pubIds = Object.keys(docs); db.pubImgIds = Object.keys(imgs); persist();
     toast(`Publicado: ${Object.keys(docs).length} códigos` + (sinCodigo ? ` · ${sinCodigo} estudiantes sin código` : ''));
   } catch (e) { toast('No se pudo publicar: ' + (e && e.message || e)); }
 }
@@ -1375,7 +1392,7 @@ function runAct(a) {
 }
 function init() {
   db = load();
-  $('#courseSel').onchange = e => { db.current = e.target.value; save(null); render(); };
+  $("#courseSel").onclick = courseSelectDialog;
   $('#btnSync').onclick = () => Sync.dialog();
   document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { tab = b.dataset.tab; render(); });
   $('#btnMenu').onclick = e => { e.stopPropagation(); $('#menu').classList.toggle('hidden'); };

@@ -35,6 +35,13 @@ h3{margin:14px 0 4px;font-size:14px;color:#4e7d2e;text-transform:uppercase;lette
 li.miss{background:#FFC7CE;color:#FF697B;font-weight:700}
 li.miss .v{color:#FF697B;font-weight:800}
 .upd{background:#fff;color:#4e7d2e;border:2px solid #4e7d2e;margin-top:14px}
+.alink{all:unset;cursor:pointer;color:#1d5fa8;text-decoration:underline}
+dialog{border:0;border-radius:14px;padding:16px;width:min(420px,92vw);box-shadow:0 10px 40px rgba(0,0,0,.35);text-align:center}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+dialog h3{margin:0 0 10px;font-size:17px;color:#1c2b12}
+dialog img{max-width:100%;max-height:65vh;border-radius:8px}
+.imload{padding:30px 0;color:#666}
+#imX{margin-top:12px}
 [hidden]{display:none}
 </style>
 </head>
@@ -50,6 +57,7 @@ li.miss .v{color:#FF697B;font-weight:800}
   <div id="res" hidden></div>
   <div class="foot">Si tus datos no son correctos o no te encuentras, consulta con tu profesor(a).</div>
 </main>
+<dialog id="imD"><h3 id="imT"></h3><div id="imB"></div><button type="button" id="imX">Cerrar</button></dialog>
 <script src="firebase-config.js"></script>
 <script type="module" src="consulta.js"></script>
 </body>

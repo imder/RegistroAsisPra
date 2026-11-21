@@ -20,7 +20,7 @@ function show(d) {
     const falta = a.c && a.v === '';
     const cls = falta ? 'miss' : '';
     const txt = falta ? 'Falta' : a.v !== '' ? esc(a.v) : 'Sin nota';
-    return `<li class="${cls}"><span>${a.t === 'inv' ? '' : '🖥️ '}${esc(a.n)}</span><span class="v ${a.v !== '' ? 'ok' : 'nc'}">${txt}</span></li>`;
+    return `<li class="${cls}"><span>${a.t === 'inv' ? '' : '🖥️ '}${a.im ? `<button type="button" class="alink" data-im="${esc(a.im)}" data-n="${esc(a.n)}">${esc(a.n)} 🖼</button>` : esc(a.n)}</span><span class="v ${a.v !== '' ? 'ok' : 'nc'}">${txt}</span></li>`;
   };
   $('res').innerHTML = `<div class="card">
     <h2>${esc(d.name)}</h2>
@@ -34,9 +34,20 @@ function show(d) {
   </div>`;
   $('res').hidden = false;
   $('upd').onclick = () => lookup(lastCode, true);
+  document.querySelectorAll('.alink').forEach(b => b.onclick = () => openImg(b.dataset.im, b.dataset.n));
   $('ts').textContent = 'Consultado a las ' + new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
 }
 
+async function openImg(id, name) {
+  $('imT').textContent = name; $('imB').innerHTML = '<div class="imload">Cargando…</div>'; $('imD').showModal();
+  try {
+    const snap = await getDoc(doc(fs, 'consultaimg', id));
+    $('imB').innerHTML = snap.exists() ? '<img alt="">' : '<div class="imload">Imagen no disponible</div>';
+    if (snap.exists()) $('imB').firstChild.src = snap.data().data;
+  } catch (e) { $('imB').innerHTML = '<div class="imload">No se pudo cargar la imagen</div>'; }
+}
+$('imX').onclick = () => $('imD').close();
+$('imD').addEventListener('click', e => { if (e.target === $('imD')) $('imD').close(); });
 let lastCode = '';
 async function lookup(code, refresh) {
   const msg = $(refresh ? 'msg2' : 'msg'), btn = refresh ? $('upd') : $('go'), label = btn.textContent;
