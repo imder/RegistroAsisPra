@@ -20,7 +20,7 @@ function show(d) {
     const falta = a.c && a.v === '';
     const cls = falta ? 'miss' : '';
     const txt = falta ? 'Falta' : a.v !== '' ? esc(a.v) : 'Sin nota';
-    return `<li class="${cls}"><span>${a.t === 'inv' ? '' : '🖥️ '}${a.im ? `<button type="button" class="alink" data-im="${esc(a.im)}" data-n="${esc(a.n)}">${esc(a.n)} 🖼</button>` : esc(a.n)}</span><span class="v ${a.v !== '' ? 'ok' : 'nc'}">${txt}</span></li>`;
+    return `<li class="${cls}"><span>${a.t === 'inv' ? '' : '🖥️ '}${a.im ? `<button type="button" class="alink" data-im="${esc(a.im)}" data-n="${esc(a.n)}">${esc(a.n)}</button>` : esc(a.n)}</span><span class="v ${a.v !== '' ? 'ok' : 'nc'}">${txt}</span></li>`;
   };
   $('res').innerHTML = `<div class="card">
     <h2>${esc(d.name)}</h2>

@@ -561,7 +561,7 @@ const isSec = c => String(c.nivel || '').toLowerCase() === 'secundaria';
 function courseSelectDialog() {
   const list = sortedCourses(db.courses);
   openDlg(`<h3>Elegir curso</h3>
-    <div class="course-grid">${list.map(c => `<button type="button" class="course-btn ${isSec(c) ? 'sec' : 'prim'} ${c.id === db.current ? 'cur' : ''}" data-cid="${c.id}"><b>${esc(sheetName(c))}</b>${c.trimestre ? `<small>${esc(triShort(c.trimestre))}</small>` : ''}</button>`).join('')}</div>
+    <div class="course-grid">${list.map(c => `<button type="button" class="course-btn ${isSec(c) ? 'sec' : 'prim'} ${c.id === db.current ? 'cur' : ''}" data-cid="${c.id}"><b>${esc(sheetName(c))}</b></button>`).join('')}</div>
     <div class="actions"><button type="button" class="btn sec" id="cx">Cerrar</button></div>`,
     f => {
       f.querySelector('#cx').onclick = closeDlg;
