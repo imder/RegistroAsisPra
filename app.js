@@ -575,6 +575,69 @@ function render() {
   else main.innerHTML = viewEstudiantes();
   const w = main.querySelector('.grid-wrap, .list');
   if (w) { w.scrollLeft = sx; w.scrollTop = sy; }
+  if (anchor && activeSid && (tab === 'asistencia' || tab === 'practicas')) {
+    const td = main.querySelector(`td[${tab === 'asistencia' ? 'data-a' : 'data-g'}="${activeSid}|${anchor.col}"]`);
+    if (td) td.classList.add('cur');
+  }
+}
+
+/* ---------- navegación con el teclado ---------- */
+function scrollToCell() {
+  const wrap = $('#main .grid-wrap'), td = $('#main td.cur');
+  if (!wrap || !td) return;
+  scrollToActive();
+  const w = wrap.getBoundingClientRect(), r = td.getBoundingClientRect();
+  const row = td.parentElement;
+  const sticky = ((row.querySelector('.c-n') || {}).offsetWidth || 0) + ((row.querySelector('.c-name') || {}).offsetWidth || 0);
+  if (r.left < w.left + sticky) wrap.scrollLeft -= w.left + sticky - r.left + 4;
+  else if (r.right > w.right) wrap.scrollLeft += r.right - w.right + 4;
+}
+function moveCursor(dx, dy) {
+  const c = C(), rows = c.students.filter(x => !x.retirado);
+  if (!rows.length) return;
+  const clamp = (v, n) => Math.max(0, Math.min(n - 1, v));
+  let ri = rows.findIndex(x => x.id === activeSid);
+  if (tab === 'estudiantes') {
+    activeSid = rows[clamp(ri < 0 ? 0 : ri + dy, rows.length)].id; render();
+    const el = $('#main .stu.active'); if (el) el.scrollIntoView({ block: 'nearest' });
+    return;
+  }
+  const cols = tab === 'asistencia' ? c.dates : c.items;
+  if (!cols.length) return;
+  let ci = cols.findIndex(x => x.id === (anchor && anchor.col));
+  if (ri < 0 || ci < 0) { ri = Math.max(ri, 0); ci = Math.max(ci, 0); }
+  else { ri = clamp(ri + dy, rows.length); ci = clamp(ci + dx, cols.length); }
+  activeSid = rows[ri].id; anchor = { sid: activeSid, col: cols[ci].id };
+  if (document.body.classList.contains('sheet-open')) { if (tab === 'practicas') gradeDialog(activeSid, anchor.col); else attChooser(activeSid, anchor.col); }
+  else render();
+  scrollToCell();
+}
+function onKey(e) {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const t = e.target;
+  if (t.closest && t.closest('input, select, textarea, [contenteditable]')) return;
+  if (!$('#menu').classList.contains('hidden')) return;
+  const dlg = $('#dlg'), sheet = document.body.classList.contains('sheet-open');
+  if (dlg.open && !sheet) return;
+  const arrows = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+  if (arrows[e.key]) { e.preventDefault(); moveCursor(...arrows[e.key]); return; }
+  if (tab === 'estudiantes') return;
+  const c = C();
+  const col = anchor && (tab === 'asistencia' ? c.dates : c.items).find(x => x.id === anchor.col);
+  const s = c.students.find(x => x.id === activeSid);
+  if (e.key === 'Escape' && sheet) { closeDlg(); return; }
+  if (!col || !s || s.retirado) return;
+  const k = e.key;
+  if (tab === 'practicas') {
+    if (k === 'Enter' || k === 'F2') { e.preventDefault(); startEdit(s.id, col.id); }
+    else if (/^\d$/.test(k)) { e.preventDefault(); startEdit(s.id, col.id, k); }
+    else if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); if (c.grades[s.id]) delete c.grades[s.id][col.id]; save(); render(); scrollToCell(); }
+  } else {
+    const m = { f: 'F', l: 'L', a: 'A', b: 'B', ' ': true, p: true }[k.toLowerCase()];
+    if (m !== undefined) { e.preventDefault(); setAtt(c, s.id, col.id, m); save(); render(); scrollToCell(); }
+    else if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); setAtt(c, s.id, col.id, ''); save(); render(); scrollToCell(); }
+    else if (k === 'Enter') { e.preventDefault(); attChooser(s.id, col.id); }
+  }
 }
 
 function scrollToActive() {
@@ -642,7 +705,7 @@ function viewPracticas() {
   h += `<div class="grid-wrap"><table class="grid prac-view"><thead><tr><th class="c-n corner">N°</th><th class="c-name corner">APELLIDOS Y NOMBRES</th>`;
   const ei = db.showEntrevista ? entIdx(c) : -1;
   const entTh = `<th class="col ent"><span>ENTREVISTA</span></th>`;
-  c.items.forEach((it, i) => { if (i === ei) h += entTh; h += `<th class="col ${colAct(it.id)} ${it.tipo === 'inv' ? 'inv' : 'prac'}" data-hi="${it.id}"><span>${it.tipo === 'inv' ? '' : '<i class="ic">🖥️</i> '}${esc(it.name)}</span></th>`; });
+  c.items.forEach((it, i) => { if (i === ei) h += entTh; h += `<th class="col ${colAct(it.id)} ${it.tipo === 'inv' ? 'inv' : 'prac'}" data-hi="${it.id}">${it.img ? `<img class="th-img" src="${it.img}" alt="">` : ''}<span>${it.tipo === 'inv' ? '' : '<i class="ic">🖥️</i> '}${esc(it.name)}</span></th>`; });
   if (ei === c.items.length) h += entTh;
   h += `</tr></thead><tbody>`;
   c.students.forEach((s, k) => {
@@ -723,17 +786,56 @@ function editDateDialog(did) {
   }
 }
 
+function readImage(file, max) {
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onerror = rej;
+    fr.onload = () => {
+      const im = new Image();
+      im.onerror = rej;
+      im.onload = () => {
+        const k = Math.min(1, max / Math.max(im.width, im.height));
+        const cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.round(im.width * k)); cv.height = Math.max(1, Math.round(im.height * k));
+        const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
+        g.drawImage(im, 0, 0, cv.width, cv.height);
+        res(cv.toDataURL('image/jpeg', 0.7));
+      };
+      im.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+function imgView(iid) {
+  const it = C().items.find(x => x.id === iid); if (!it || !it.img) return;
+  openDlg(`<h3>${esc(it.name)}</h3><img class="img-big" src="${it.img}" alt="">
+    <div class="actions"><button type="button" class="btn sec" id="ed">Editar actividad</button><button type="button" class="btn" id="cx">Cerrar</button></div>`,
+    f => { f.querySelector('#cx').onclick = closeDlg; f.querySelector('#ed').onclick = () => { closeDlg(); itemDialog(iid); }; });
+}
 function itemDialog(iid) {
   const c = C(), it = iid ? c.items.find(x => x.id === iid) : null;
   const suggest = t => `${t === 'inv' ? 'INVESTIGACION' : 'P'}${c.items.filter(x => x.tipo === t).length + 1}${t === 'inv' ? '' : '-'}`;
   const t0 = it ? it.tipo : 'prac';
+  let img = (it && it.img) || '';
   openDlg(`<h3>${it ? 'Editar actividad' : 'Nueva actividad'}</h3>
     <label>Tipo<select id="it"><option value="prac" ${t0 !== 'inv' ? 'selected' : ''}>Práctica</option><option value="inv" ${t0 === 'inv' ? 'selected' : ''}>Investigación</option></select></label>
     <label>Nombre<input id="iv" value="${esc(it ? it.name : suggest(t0))}" maxlength="40" autocomplete="off"></label>
+    <div class="img-edit"><span class="lbl">Imagen de la actividad (opcional)</span>
+      <div class="img-row"><div class="img-prev" id="ip"></div>
+        <div class="img-btns"><button type="button" class="btn sec" id="ipick">Elegir imagen</button><button type="button" class="btn sec" id="irm">Quitar</button></div></div>
+      <input type="file" id="ifile" accept="image/*" hidden></div>
     <div class="actions">${it ? '<button type="button" class="btn danger" id="del">Eliminar</button>' : ''}<button type="button" class="btn sec" id="cx">Cancelar</button><button class="btn" id="ok">Guardar</button></div>`,
     f => {
       f.querySelector('#cx').onclick = closeDlg;
       f.querySelector('#ok').onclick = doSave;
+      const showImg = () => { f.querySelector('#ip').innerHTML = img ? `<img src="${img}" alt="">` : '<span>Sin imagen</span>'; f.querySelector('#irm').disabled = !img; };
+      showImg();
+      f.querySelector('#ipick').onclick = () => f.querySelector('#ifile').click();
+      f.querySelector('#irm').onclick = () => { img = ''; showImg(); };
+      f.querySelector('#ifile').onchange = async e => {
+        const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+        try { img = await readImage(file, 240); showImg(); } catch (err) { toast('No se pudo leer la imagen'); }
+      };
       if (!it) {   // al cambiar el tipo se actualiza el nombre sugerido, salvo que ya lo hayas escrito tú
         let last = suggest(t0);
         f.querySelector('#it').onchange = e => {
@@ -753,7 +855,8 @@ function itemDialog(iid) {
   function doSave() {
     const name = $('#iv').value.trim(); if (!name) return;
     const tp = $('#it').value;
-    if (it) { it.name = name; it.tipo = tp; } else c.items.push({ id: uid(), name, tipo: tp });
+    if (it) { it.name = name; it.tipo = tp; if (img) it.img = img; else delete it.img; }
+    else c.items.push(img ? { id: uid(), name, tipo: tp, img } : { id: uid(), name, tipo: tp });
     save(); closeDlg(); render();
   }
 }
@@ -793,14 +896,14 @@ function gradeDialog(sid, iid) {
 /* ---------- escribir la nota directamente en la celda (doble toque) ---------- */
 let lastTap = { key: '', t: 0 };
 let lastAtt = { key: '', t: 0, prev: undefined };
-function startEdit(sid, iid) {
+function startEdit(sid, iid, initial) {
   const td = $(`#main td[data-g="${sid}|${iid}"]`);
   if (!td) return;
   closeDlg();
   const c = C();
   activeSid = sid; anchor = { sid, col: iid };
   const cur = (c.grades[sid] && c.grades[sid][iid]) ?? '';
-  td.innerHTML = `<input class="cell-in" value="${esc(cur)}" maxlength="8" autocomplete="off" enterkeyhint="next">`;
+  td.innerHTML = `<input class="cell-in" value="${esc(initial !== undefined ? initial : cur)}" maxlength="8" autocomplete="off" enterkeyhint="next">`;
   const inp = td.firstChild;
   let done = false;
   const finish = (move) => {
@@ -813,18 +916,19 @@ function startEdit(sid, iid) {
     }
     if (move) {
       const idx = c.students.findIndex(x => x.id === sid);
-      const next = c.students.slice(idx + 1).find(x => !x.retirado);
-      if (next) { activeSid = next.id; render(); startEdit(next.id, iid); scrollToActive(); return; }
-      toast('Fin de la lista');
+      const next = move > 0 ? c.students.slice(idx + 1).find(x => !x.retirado) : c.students.slice(0, idx).reverse().find(x => !x.retirado);
+      if (next) { activeSid = next.id; anchor = { sid: next.id, col: iid }; render(); startEdit(next.id, iid); scrollToCell(); return; }
+      if (move > 0) toast('Fin de la lista');
     }
-    render();
+    render(); scrollToCell();
   };
   inp.onkeydown = e => {
-    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    if (e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); finish(1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); finish(-1); }
     else if (e.key === 'Escape') { done = true; render(); }
   };
   inp.onblur = () => finish(false);
-  inp.focus(); inp.select();
+  inp.focus(); if (initial !== undefined) inp.setSelectionRange(inp.value.length, inp.value.length); else inp.select();
 }
 
 /* ---------- asistencia: elegir L / B con doble toque ---------- */
@@ -1291,6 +1395,7 @@ function init() {
     e.preventDefault();
     pasteGridDialog(tab === 'asistencia' ? 'att' : 'prac', text);
   });
+  document.addEventListener('keydown', onKey);
   mainEl.addEventListener('change', e => {
     const t = e.target;
     if (t.matches && t.matches('select[data-actsel]')) { const a = t.value; t.value = ''; if (a) runAct(a); }
@@ -1316,6 +1421,7 @@ function init() {
       if (lastTap.key === key && now - lastTap.t < 400) { lastTap = { key: '', t: 0 }; startEdit(sid, iid); }
       else { lastTap = { key, t: now }; gradeDialog(sid, iid); }
     } else if ((el = t.closest('[data-hd]'))) editDateDialog(el.dataset.hd);
+    else if ((el = t.closest('.th-img'))) imgView(el.closest('[data-hi]').dataset.hi);
     else if ((el = t.closest('[data-hi]'))) itemDialog(el.dataset.hi);
     else if ((el = t.closest('[data-edit]'))) studentDialog(el.dataset.edit);
     else if ((el = t.closest('[data-go]'))) { tab = el.dataset.go; render(); }

@@ -41,3 +41,12 @@ Muestra "Entrevista" cuando al estudiante le faltan 2 o más actividades (celdas
 
 ## Consulta para estudiantes
 `consulta.html`: el estudiante ingresa su RUDE o C.I. y ve actividades realizadas, faltantes y si tiene entrevista. Requiere Firebase y las reglas de SINCRONIZACION.md (sección "Página de consulta"). Registra los códigos en Estudiantes y publica con ⋮ → Publicar consulta de estudiantes.
+
+## Teclado (Asistencia y Prácticas)
+- Flechas: mover la celda actual (marcada con un borde). Si hay panel de notas/asistencia abierto, se actualiza a la nueva celda.
+- Prácticas: escribir un número empieza a anotar la nota en la celda; Enter / ↓ guarda y baja, ↑ guarda y sube; Supr/Retroceso borra.
+- Asistencia: F, L, A, B marcan; Espacio o P = presente ✓; Supr/Retroceso borra; Enter abre el selector.
+- Estudiantes: ↑ ↓ resaltan al estudiante anterior/siguiente.
+
+## Imagen de actividad
+En Prácticas, toca el encabezado de la actividad → "Imagen de la actividad" → Elegir imagen (se reduce automáticamente). Aparece una miniatura en el encabezado; tócala para verla ampliada.
