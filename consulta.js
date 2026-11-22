@@ -26,7 +26,6 @@ function show(d) {
     <h2>${esc(d.name)}</h2>
     <div class="sub">${esc(d.curso)}${d.area ? ' · ' + esc(d.area) : ''}${d.prof ? ' · ' + esc(d.prof) : ''}</div>
     <div class="sum"><div class="s-ok"><b>${done.length}</b>Realizadas</div><div class="s-no"><b>${miss.length}</b>Faltantes</div></div>
-    <div class="ent ${d.ent ? 'yes' : 'no'}">${d.ent ? `Corresponde entrevista${d.tri ? ' del ' + esc(d.tri.replace(/TRIMESTRE/i, 'Trimestre')) : ''}` : 'No tienes entrevista pendiente'}</div>
     <ul>${counted.map(row).join('')}</ul>
     <button type="button" id="upd" class="upd">⟳ Actualizar</button>
     <div class="foot" id="ts"></div>

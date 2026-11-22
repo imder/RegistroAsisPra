@@ -25,7 +25,7 @@ function newCourse(extra) {
   return Object.assign({
     id: uid(), unidad: '', prof: '', area: '', grado: '', paralelo: '', nivel: '',
     trimestre: TRIMESTRES[0], anio: new Date().getFullYear(),
-    students: [], dates: [], items: [], att: {}, grades: {}, entMin: 2, entPos: null
+    students: [], dates: [], items: [], att: {}, grades: {}, entMin: 2, entPos: null, obs: {}, hid: []
   }, extra || {});
 }
 function defaultDB() {
@@ -159,6 +159,7 @@ const ENTREVISTA_MIN = 2;   // actividades sin nota a partir de las cuales corre
 function missingCount(c, sid) {
   return c.items.slice(0, entIdx(c)).filter(it => { const v = c.grades[sid] && c.grades[sid][it.id]; return v === undefined || v === ''; }).length;
 }
+const isHid = (c, id) => (c.hid || []).includes(id);
 const entMin = c => Math.max(1, parseInt(c.entMin, 10) || ENTREVISTA_MIN);
 const entIdx = c => c.entPos == null ? c.items.length : Math.max(0, Math.min(c.items.length, c.entPos));
 const needsEntrevista = (c, s) => !s.retirado && missingCount(c, s.id) >= entMin(c);
@@ -613,7 +614,7 @@ function moveCursor(dx, dy) {
     const el = $('#main .stu.active'); if (el) el.scrollIntoView({ block: 'nearest' });
     return;
   }
-  const cols = tab === 'asistencia' ? c.dates : c.items;
+  const cols = tab === 'asistencia' ? c.dates : c.items.filter(x => !isHid(c, x.id));
   if (!cols.length) return;
   let ci = cols.findIndex(x => x.id === (anchor && anchor.col));
   if (ri < 0 || ci < 0) { ri = Math.max(ri, 0); ci = Math.max(ci, 0); }
@@ -710,14 +711,15 @@ function viewAsistencia() {
 
 function viewPracticas() {
   const c = C();
-  let h = `<div class="toolbar">${actMenu([['add-item', '+ Actividad'], ['paste-prac', 'Pegar de Excel'], ['reorder-items', 'Ordenar'], ['toggle-ent', db.showEntrevista ? 'Ocultar Entrevista' : 'Mostrar Entrevista'], ['ent-min', `Entrevista desde ${entMin(c)} faltantes…`], undoOpt('prac')])}
+  let h = `<div class="toolbar">${actMenu([['add-item', '+ Actividad'], ['paste-prac', 'Pegar de Excel'], ['reorder-items', 'Ordenar'], ['toggle-ent', db.showEntrevista ? 'Ocultar Entrevista' : 'Mostrar Entrevista'], ['ent-min', `Entrevista desde ${entMin(c)} faltantes…`], (c.hid || []).some(id => c.items.some(x => x.id === id)) ? ['show-hidden', `Actividades ocultas (${c.items.filter(x => isHid(c, x.id)).length})…`] : null, undoOpt('prac')])}
     <span class="grow stat hint">${c.items.length} actividades${db.showEntrevista ? ` · ${c.students.filter(s => needsEntrevista(c, s)).length} en entrevista` : ''}</span></div>`;
   if (!c.students.length) return h + noStudents();
   h += `<div class="grid-wrap"><table class="grid prac-view"><thead><tr><th class="c-n corner">N°</th><th class="c-name corner">APELLIDOS Y NOMBRES</th>`;
   const ei = db.showEntrevista ? entIdx(c) : -1;
   const entTh = `<th class="col ent"><span>ENTREVISTA</span></th>`;
-  c.items.forEach((it, i) => { if (i === ei) h += entTh; h += `<th class="col ${colAct(it.id)} ${it.tipo === 'inv' ? 'inv' : 'prac'}" data-hi="${it.id}">${it.img ? `<img class="th-img" src="${it.img}" alt="">` : ''}<span>${it.tipo === 'inv' ? '' : '<i class="ic">🖥️</i> '}${esc(it.name)}</span></th>`; });
+  c.items.forEach((it, i) => { if (i === ei) h += entTh; if (isHid(c, it.id)) return; h += `<th class="col ${colAct(it.id)} ${it.tipo === 'inv' ? 'inv' : 'prac'}" data-hi="${it.id}">${it.img ? `<img class="th-img" src="${it.img}" alt="">` : ''}<span>${it.tipo === 'inv' ? '' : '<i class="ic">🖥️</i> '}${esc(it.name)}</span></th>`; });
   if (ei === c.items.length) h += entTh;
+  h += `<th class="col obs"><span>OBSERVACIONES</span></th>`;
   h += `</tr></thead><tbody>`;
   c.students.forEach((s, k) => {
     const ret = s.retirado;
@@ -725,11 +727,13 @@ function viewPracticas() {
     const entTd = needsEntrevista(c, s) ? `<td class="ent flag" title="Le faltan ${missingCount(c, s.id)} actividades (antes de Entrevista)">Entrevista</td>` : `<td class="ent"></td>`;
     c.items.forEach((it, i) => {
       if (i === ei) h += entTd;
+      if (isHid(c, it.id)) return;
       const v = c.grades[s.id] && c.grades[s.id][it.id];
       const has = !ret && v !== undefined && v !== '';
       h += `<td class="cell ${has ? 'on' : 'pend'} ${colAct(it.id)}" ${ret ? '' : `data-g="${s.id}|${it.id}"`}>${has ? esc(v) : ''}</td>`;
     });
     if (ei === c.items.length) h += entTd;
+    h += `<td class="obs" ${ret ? '' : `data-obs="${s.id}"`}>${ret ? '' : esc((c.obs && c.obs[s.id]) || '')}</td>`;
     h += `</tr>`;
   });
   return h + `</tbody></table></div>`;
@@ -797,6 +801,45 @@ function editDateDialog(did) {
   }
 }
 
+function startObs(sid) {
+  const td = $(`#main td[data-obs="${sid}"]`);
+  if (!td) return;
+  closeDlg();
+  const c = C(), cur = (c.obs && c.obs[sid]) || '';
+  td.innerHTML = `<textarea class="obs-in" rows="2" maxlength="300" placeholder="Observaciones"></textarea>`;
+  const ta = td.firstChild; ta.value = cur;
+  let done = false;
+  const finish = cancel => {
+    if (done) return; done = true;
+    if (!cancel) {
+      const v = ta.value.trim();
+      if (v !== cur) { c.obs = c.obs || {}; if (v) c.obs[sid] = v; else delete c.obs[sid]; save(); }
+    }
+    render();
+  };
+  ta.onkeydown = e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); finish(); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(true); }
+  };
+  ta.onblur = () => finish();
+  ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+}
+function hiddenDialog() {
+  const c = C();
+  const list = c.items.filter(x => isHid(c, x.id));
+  if (!list.length) { toast('No hay actividades ocultas'); return; }
+  openDlg(`<h3>Actividades ocultas</h3>
+    <div class="hid-list">${list.map(x => `<div class="hid-row"><span>${esc(itemLabel(x))}</span><button type="button" class="btn sec" data-show="${x.id}">Mostrar</button></div>`).join('')}</div>
+    <div class="actions"><button type="button" class="btn sec" id="cx">Cerrar</button><button type="button" class="btn" id="all">Mostrar todas</button></div>`,
+    f => {
+      f.querySelector('#cx').onclick = closeDlg;
+      f.querySelector('#all').onclick = () => { c.hid = []; save(); closeDlg(); render(); };
+      f.querySelectorAll('[data-show]').forEach(b => b.onclick = () => {
+        c.hid = (c.hid || []).filter(id => id !== b.dataset.show); save(); render();
+        if (c.items.some(x => isHid(c, x.id))) hiddenDialog(); else closeDlg();
+      });
+    });
+}
 function readImage(file, max) {
   return new Promise((res, rej) => {
     const fr = new FileReader();
@@ -835,6 +878,7 @@ function itemDialog(iid) {
       <div class="img-row"><div class="img-prev" id="ip"></div>
         <div class="img-btns"><button type="button" class="btn sec" id="ipick">Elegir imagen</button><button type="button" class="btn sec" id="irm">Quitar</button></div></div>
       <input type="file" id="ifile" accept="image/*" hidden></div>
+    ${it ? '<button type="button" class="btn sec" id="hide">Ocultar esta columna</button>' : ''}
     <div class="actions">${it ? '<button type="button" class="btn danger" id="del">Eliminar</button>' : ''}<button type="button" class="btn sec" id="cx">Cancelar</button><button class="btn" id="ok">Guardar</button></div>`,
     f => {
       f.querySelector('#cx').onclick = closeDlg;
@@ -854,6 +898,8 @@ function itemDialog(iid) {
           if (inp.value === last) { last = suggest(e.target.value); inp.value = last; }
         };
       }
+      const hb = f.querySelector('#hide');
+      if (hb) hb.onclick = () => { c.hid = (c.hid || []).concat(it.id); save(); closeDlg(); render(); toast('Columna oculta · Acciones → Actividades ocultas'); };
       const del = f.querySelector('#del');
       if (del) del.onclick = () => {
         if (!confirm('¿Eliminar esta actividad y sus notas?')) return;
@@ -981,7 +1027,7 @@ function reorderDialog(kind) {
   const ENT = { id: '__ent', ent: true };
   let arr = kind === 'dates' ? c.dates : c.items.slice();
   if (withEnt) arr.splice(entIdx(c), 0, ENT);
-  const label = x => x.ent ? 'ENTREVISTA' : kind === 'dates' ? dateLabel(x.date) : itemLabel(x);
+  const label = x => x.ent ? 'ENTREVISTA' : kind === 'dates' ? dateLabel(x.date) : itemLabel(x) + (isHid(c, x.id) ? ' (oculta)' : '');
   const sync = () => { if (kind !== 'items') return; const k = arr.indexOf(ENT); c.items = arr.filter(x => x !== ENT); if (k >= 0) c.entPos = k >= c.items.length ? null : k; };
   let hl = -1;
   openDlg(`<h3>${kind === 'dates' ? 'Ordenar fechas' : 'Ordenar actividades'}</h3>
@@ -1385,6 +1431,7 @@ function runAct(a) {
   else if (a === 'reorder-items') reorderDialog('items');
   else if (a === 'undo-paste') undoPaste();
   else if (a === 'ent-min') entMinDialog();
+  else if (a === 'show-hidden') hiddenDialog();
   else if (a === 'add-item') itemDialog(null);
   else if (a === 'add-student') studentDialog(null);
   else if (a === 'paste-students') pasteDialog();
@@ -1422,6 +1469,7 @@ function init() {
     let el;
     if (t.closest('.cell-in')) return;
     if ((el = t.closest('[data-edit]'))) { studentDialog(el.dataset.edit); return; }
+    if ((el = t.closest('[data-obs]'))) { if (t.closest('textarea')) return; activeSid = el.dataset.obs; render(); startObs(activeSid); scrollToActive(); return; }
     if ((el = t.closest('[data-sid]'))) {
       closeDlg();
       activeSid = el.dataset.sid; anchor = { sid: activeSid, col: anchor && anchor.col };
@@ -1456,4 +1504,4 @@ function init() {
 }
 
 if (typeof document !== 'undefined' && document.getElementById) init();
-if (typeof module !== 'undefined') module.exports = { buildPublic, planCodes, missingCount, needsEntrevista, sortedCourses, courseCmp, splitName, sheetName, itemLabel, parsePaste, planPaste, detectNameCol, looksLikeHeader, attMark, normName, courseShort, buildXlsx, newCourse, attStats, average, dateLabel, normalizeDB, mergeRemote, pendingWrites, isPristine };
+if (typeof module !== 'undefined') module.exports = { isHid, buildPublic, planCodes, missingCount, needsEntrevista, sortedCourses, courseCmp, splitName, sheetName, itemLabel, parsePaste, planPaste, detectNameCol, looksLikeHeader, attMark, normName, courseShort, buildXlsx, newCourse, attStats, average, dateLabel, normalizeDB, mergeRemote, pendingWrites, isPristine };

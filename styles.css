@@ -247,3 +247,13 @@ dialog.sheet #dlgForm{gap:6px;padding:8px max(12px,env(safe-area-inset-right)) c
 .course-btn.prim{background:#fff}
 .course-btn.sec{background:#B3DFF3}
 .course-btn.cur{border-color:#2e5a14;box-shadow:0 0 0 2px #4e7d2e}
+
+/* OBSERVACIONES */
+.grid th.col.obs{background:#D04CC0!important;min-width:190px;width:190px;cursor:default}
+.grid th.col.obs span{writing-mode:horizontal-tb;transform:none;color:#fff!important;max-height:none;padding:0}
+.grid td.obs,.grid tbody tr.active td.obs,.prac-view tbody tr.active td.obs{background:#F2CFEE!important;min-width:190px;width:190px;max-width:190px;text-align:left;font-size:13px;font-weight:400;color:#2b1028;white-space:normal;word-break:break-word;padding:3px 6px;cursor:text}
+.grid tbody tr.retirado td.obs{background:#e49edd!important}
+.obs-in{width:100%;min-height:46px;font:inherit;font-size:14px;border:2px solid #D04CC0;border-radius:4px;padding:3px 5px;resize:vertical;background:#fff}
+.hid-list{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto}
+.hid-row{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:15px}
+.grid tbody tr.active td.ent:not(.flag),.prac-view tbody tr.active td.ent:not(.flag){background:#fff!important}
